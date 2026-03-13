@@ -1,0 +1,16 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Runtime artifacts
+.adk/
+
+# Frontend build/deps
+roomGPT_frontend/node_modules/
+roomGPT_frontend/.next/
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.vscode/
