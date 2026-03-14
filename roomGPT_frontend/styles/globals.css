@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ========== 主页背景 ========== */
 .home-cinematic::before {
   content: "";
   position: fixed;
@@ -24,39 +25,6 @@
   opacity: 0.09;
 }
 
-@media (min-width: 400px) {
-  .background-gradient {
-    isolation: isolate;
-  }
-
-  .background-gradient::before {
-    background:
-      radial-gradient(38% 52% at 18% 14%, rgba(28, 93, 255, 0.35) 0%, rgba(28, 93, 255, 0) 100%),
-      radial-gradient(36% 48% at 86% 20%, rgba(51, 199, 255, 0.22) 0%, rgba(51, 199, 255, 0) 100%),
-      radial-gradient(48% 62% at 50% 86%, rgba(47, 89, 220, 0.26) 0%, rgba(47, 89, 220, 0) 100%);
-    z-index: -10;
-    content: "";
-    position: absolute;
-    inset: 0px;
-    transform: scale(1.02);
-    pointer-events: none;
-    animation: ambientShift 20s ease-in-out infinite alternate;
-  }
-
-  .background-gradient::after {
-    content: "";
-    position: absolute;
-    inset: -10% -5%;
-    z-index: -9;
-    pointer-events: none;
-    background:
-      radial-gradient(22% 26% at 15% 70%, rgba(147, 197, 253, 0.16) 0%, rgba(147, 197, 253, 0) 100%),
-      radial-gradient(18% 22% at 80% 65%, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0) 100%);
-    filter: blur(10px);
-    animation: ambientFloat 22s ease-in-out infinite;
-  }
-}
-
 .intro-zoom-card {
   transform: translateY(0) scale(1);
   transform-origin: center;
@@ -68,6 +36,27 @@
   box-shadow: 0 24px 54px rgba(22, 75, 170, 0.25);
 }
 
+/* ========== Dream 页面背景 ========== */
+.dream-background {
+  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+}
+
+.dream-background .animate-pulse {
+  animation: dreamPulse 4s ease-in-out infinite;
+}
+
+@keyframes dreamPulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.05);
+  }
+}
+
+/* ========== 通用动画 ========== */
 @keyframes ambientShift {
   0% {
     transform: translate3d(-1.5%, 0%, 0) scale(1.02);
@@ -95,11 +84,11 @@
   }
 }
 
+/* ========== 减少动画偏好 ========== */
 @media (prefers-reduced-motion: reduce) {
   .home-cinematic::before,
   .home-cinematic::after,
-  .background-gradient::before,
-  .background-gradient::after {
+  .dream-background .animate-pulse {
     animation: none;
   }
 

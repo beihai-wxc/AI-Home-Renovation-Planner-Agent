@@ -19,7 +19,7 @@ export default function LumiereIntro({ onComplete }: LumiereIntroProps) {
   const [isVisible, setIsVisible] = useState(true);
 
   // 动画配置常量
-  const strokeDuration = 2.5; // 描边书写时长
+  const strokeDuration = 2; // 描边书写时长
   const fillDuration = 0.8;   // 填充颜色渐变时长
   const totalDuration = strokeDuration + fillDuration + 0.5; // 总时长预留一点缓冲
 

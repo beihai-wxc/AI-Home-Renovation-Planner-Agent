@@ -76,15 +76,33 @@ export default function HomePage() {
   const [showIntro, setShowIntro] = useState(true);
 
   return (
-    <div className="home-cinematic relative mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center overflow-hidden py-2">
+    <div className="home-cinematic relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
+      {/* 动态背景层 */}
+      <div className="dream-background fixed inset-0 -z-10 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e]" />
+        <div className="absolute inset-0">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+          <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-cyan-500/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: "2s" }} />
+        </div>
+        {/* 网格纹理 */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+            backgroundSize: '40px 40px'
+          }}
+        />
+      </div>
+
       {showIntro && <LumiereIntro onComplete={() => setShowIntro(false)} />}
       <Header />
-      <main className="background-gradient relative mt-10 flex w-full flex-1 flex-col items-center justify-center px-4 text-center sm:mt-12">
+      <main className="relative mt-10 flex w-full flex-1 flex-col items-center justify-center px-4 text-center sm:mt-12">
         <motion.h1
           initial={{ opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.75 }}
-          className="mx-auto max-w-5xl font-display text-4xl font-bold tracking-tight text-gray-100 sm:text-7xl"
+          className="mx-auto max-w-6xl font-display text-4xl font-bold tracking-tight text-gray-100 sm:text-7xl"
         >
           为每个人生成{" "}
           <span className="relative whitespace-nowrap text-blue-400">
@@ -97,7 +115,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.08 }}
-          className="mx-auto mt-7 max-w-3xl text-base leading-8 text-slate-300 sm:mt-10 sm:text-2xl"
+          className="mx-auto mt-7 max-w-4xl text-base leading-8 text-slate-300 sm:mt-10 sm:text-2xl"
         >
           上传真实房间照片，体验更有沉浸感的 AI 改造预览。先看效果，再做决策，让装修方案更有把握。
         </motion.h2>
@@ -124,8 +142,8 @@ export default function HomePage() {
           <PairedCarousel pairs={pairedSlides} interval={3400} />
         </motion.section>
 
-        <section className="mt-12 w-full pb-10 sm:mt-16 sm:pb-16">
-          <div className="mx-auto max-w-5xl text-left">
+        <section className="mt-12 w-full pb-10 sm:mt-16 sm:pb-16 px-4">
+          <div className="mx-auto max-w-6xl text-left">
             <motion.h3
               initial={{ opacity: 0, y: 18 }}
               whileInView={{ opacity: 1, y: 0 }}
