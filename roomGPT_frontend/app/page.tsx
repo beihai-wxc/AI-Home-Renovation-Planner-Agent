@@ -77,37 +77,29 @@ export default function HomePage() {
 
   return (
     <div className="home-cinematic relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
-      {/* 动态背景层 */}
+      {/* 温暖动态背景层 */}
       <div className="dream-background fixed inset-0 -z-10 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e]" />
+        {/* 主背景由 CSS 渐变控制 */}
         <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
-          <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-cyan-500/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: "2s" }} />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-600/[0.08] rounded-full blur-3xl animate-pulse" style={{ animationDelay: "0s" }} />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-600/[0.06] rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
+          <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-teal-500/[0.05] rounded-full blur-2xl animate-pulse" style={{ animationDelay: "4s" }} />
         </div>
-        {/* 网格纹理 */}
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
-            backgroundSize: '40px 40px'
-          }}
-        />
       </div>
 
       {showIntro && <LumiereIntro onComplete={() => setShowIntro(false)} />}
       <Header />
-      <main className="relative mt-10 flex w-full flex-1 flex-col items-center justify-center px-4 text-center sm:mt-12">
+      <main className="relative mt-10 flex w-full flex-1 flex-col items-center justify-center px-6 text-center sm:mt-12">
         <motion.h1
           initial={{ opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.75 }}
-          className="mx-auto max-w-6xl font-display text-4xl font-bold tracking-tight text-gray-100 sm:text-7xl"
+          className="mx-auto max-w-6xl font-display text-4xl font-bold tracking-tight text-[#2D2D2D] sm:text-7xl"
         >
-          为每个人生成{" "}
-          <span className="relative whitespace-nowrap text-blue-400">
+          把你的家变成{" "}
+          <span className="relative whitespace-nowrap text-[#8B6F47]">
             <SquigglyLines />
-            <span className="relative">梦想中的房间</span>
+            <span className="relative">理想的样子</span>
           </span>
         </motion.h1>
 
@@ -115,9 +107,10 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.08 }}
-          className="mx-auto mt-7 max-w-4xl text-base leading-8 text-slate-300 sm:mt-10 sm:text-2xl"
+          className="mx-auto mt-7 max-w-4xl text-base leading-8 text-[#5A5A5A] sm:mt-10 sm:text-2xl"
         >
-          上传真实房间照片，体验更有沉浸感的 AI 改造预览。先看效果，再做决策，让装修方案更有把握。
+          上传房间照片，预览改造效果。<br className="hidden sm:block" />
+          先看效果，再做决定，让装修方案更有把握。
         </motion.h2>
 
         <motion.div
@@ -126,10 +119,10 @@ export default function HomePage() {
           transition={{ duration: 0.7, delay: 0.16 }}
         >
           <Link
-            className="mt-8 inline-flex rounded-2xl bg-blue-600 px-6 py-3 text-lg font-semibold text-white shadow-[0_16px_48px_rgba(37,99,235,0.55)] transition hover:-translate-y-0.5 hover:bg-blue-500"
+            className="btn-warm mt-8 inline-flex rounded-2xl bg-[#8B6F47] px-8 py-4 text-lg font-semibold text-white transition-all duration-300 hover:bg-[#A68B5B]"
             href="/dream"
           >
-            生成您的梦想房间
+            开始设计你的空间
           </Link>
         </motion.div>
 
@@ -142,14 +135,14 @@ export default function HomePage() {
           <PairedCarousel pairs={pairedSlides} interval={3400} />
         </motion.section>
 
-        <section className="mt-12 w-full pb-10 sm:mt-16 sm:pb-16 px-4">
-          <div className="mx-auto max-w-6xl text-left">
+        <section className=”mt-12 w-full pb-10 sm:mt-16 sm:pb-16 px-6”>
+          <div className=”mx-auto max-w-6xl text-left”>
             <motion.h3
               initial={{ opacity: 0, y: 18 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}
               transition={{ duration: 0.55 }}
-              className="text-center text-2xl font-semibold text-gray-100 sm:text-3xl"
+              className=”text-center text-2xl font-semibold text-[#2D2D2D] sm:text-3xl”
             >
               关于这个项目
             </motion.h3>
@@ -158,12 +151,12 @@ export default function HomePage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.55, delay: 0.08 }}
-              className="mx-auto mt-4 max-w-3xl text-center text-base leading-7 text-gray-300 sm:text-lg"
+              className=”mx-auto mt-4 max-w-3xl text-center text-base leading-7 text-[#5A5A5A] sm:text-lg”
             >
-              我们希望把装修沟通变成“看得见、说得清、能落地”的过程，因此你会在同一页面看到灵感、效果和解释。
+              我们希望让装修沟通变得看得见、说得清、能落地，让每个家都有温度。
             </motion.p>
 
-            <div className="mt-7 grid grid-cols-1 gap-4 sm:mt-10 md:grid-cols-3">
+            <div className=”mt-7 grid grid-cols-1 gap-5 sm:mt-10 md:grid-cols-3”>
               {introCards.map((card, index) => (
                 <motion.article
                   key={card.title}
@@ -171,10 +164,10 @@ export default function HomePage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: 0.5, delay: 0.1 * index }}
-                  className="intro-zoom-card rounded-2xl border border-white/15 bg-white/[0.04] p-5 shadow-[0_14px_42px_rgba(0,0,0,0.3)] backdrop-blur-sm transition hover:border-blue-400/45 hover:bg-white/[0.08]"
+                  className=”intro-zoom-card rounded-2xl border border-[#8B6F47]/15 bg-white p-6 backdrop-blur-sm transition hover:border-[#8B6F47]/35”
                 >
-                  <h4 className="text-lg font-semibold text-blue-300">{card.title}</h4>
-                  <p className="mt-3 text-sm leading-7 text-gray-200">{card.content}</p>
+                  <h4 className=”text-lg font-semibold text-[#8B6F47]”>{card.title}</h4>
+                  <p className=”mt-3 text-sm leading-7 text-[#5A5A5A]”>{card.content}</p>
                 </motion.article>
               ))}
             </div>

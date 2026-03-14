@@ -41,10 +41,10 @@ export default function LumiereIntro({ onComplete }: LumiereIntroProps) {
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.8, ease: "easeInOut" }}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-[#070b14] text-white"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-[#FAF8F5] text-[#2D2D2D]"
         >
-          {/* 背景光晕效果 */}
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(50,100,200,0.15)_0%,rgba(7,11,20,0)_60%)]" />
+          {/* 温暖背景光晕效果 */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,111,71,0.12)_0%,rgba(250,248,245,0)_60%)]" />
           
           <div className={`relative z-10 ${sacramento.className}`}>
             <svg

@@ -27,8 +27,8 @@ function SlidePanel({
 }) {
   return (
     <div>
-      <h3 className="mb-3 text-center text-xl font-semibold text-white sm:text-4xl">{title}</h3>
-      <div className="group relative w-full overflow-hidden rounded-3xl border border-white/20 bg-black/35 shadow-[0_28px_90px_rgba(0,0,0,0.48)] transition duration-500 hover:border-blue-300/45 hover:shadow-[0_30px_110px_rgba(30,102,255,0.28)]">
+      <h3 className="mb-3 text-center text-xl font-semibold text-[#2D2D2D] sm:text-4xl">{title}</h3>
+      <div className="image-card group relative w-full overflow-hidden rounded-3xl border border-[#8B6F47]/20 bg-white/50 backdrop-blur-sm shadow-[0_8px_32px_rgba(139,111,71,0.08)] transition duration-500 hover:border-[#8B6F47]/40">
         <div className="relative h-[240px] w-full sm:h-[360px] lg:h-[430px]">
           <AnimatePresence mode="wait">
             <motion.div
@@ -44,12 +44,12 @@ function SlidePanel({
                 alt={imageAlt}
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover transition duration-700 group-hover:scale-110"
+                className="object-cover transition duration-700 group-hover:scale-105"
               />
             </motion.div>
           </AnimatePresence>
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/55 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#FAF8F5]/80 to-transparent" />
       </div>
     </div>
   );
@@ -83,7 +83,7 @@ export default function PairedCarousel({ pairs, interval = 3500 }: PairedCarouse
             aria-label={`切换到第 ${index + 1} 组对比图`}
             onClick={() => setActiveIndex(index)}
             className={`h-2.5 rounded-full transition-all duration-300 ${
-              index === activeIndex ? "w-7 bg-blue-400" : "w-2.5 bg-white/45"
+              index === activeIndex ? "w-7 bg-[#8B6F47]" : "w-2.5 bg-[#C9B896]/50"
             }`}
           />
         ))}

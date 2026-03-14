@@ -3,21 +3,21 @@ import Link from "next/link";
 
 export default function Header() {
   return (
-    <header className="flex flex-col xs:flex-row justify-between items-center w-full mt-3 border-b pb-7 sm:px-4 px-2 border-gray-500 gap-2">
-      <Link href="/" className="flex space-x-2">
+    <header className="flex flex-col xs:flex-row justify-between items-center w-full mt-3 border-b pb-7 sm:px-6 px-4 border-[#8B6F47]/20 gap-2">
+      <Link href="/" className="flex space-x-2 group">
         <Image
           alt="Lumière logo"
           src="/bed.svg"
-          className="sm:w-10 sm:h-10 w-9 h-9"
+          className="sm:w-10 sm:h-10 w-9 h-9 transition-transform duration-300 group-hover:scale-110"
           width={24}
           height={24}
         />
-        <h1 className="sm:text-3xl text-xl font-bold ml-2 tracking-tight">
+        <h1 className="sm:text-3xl text-xl font-bold ml-2 tracking-tight text-[#2D2D2D] transition-colors duration-300 group-hover:text-[#8B6F47]">
           Lumière
         </h1>
       </Link>
-      <div className="text-gray-400 text-sm hidden sm:block">
-        AI 智能家装规划服务
+      <div className="text-[#8A8A8A] text-sm hidden sm:block">
+        让每个家都有温度
       </div>
     </header>
   );

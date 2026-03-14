@@ -59,7 +59,7 @@ export default function DreamPage() {
 
   const UploadDropZone = () => (
     <div
-      className="mt-4 flex flex-col items-center justify-center border-2 border-dashed border-white/20 rounded-2xl p-12 bg-white/5 hover:bg-white/10 backdrop-blur-sm transition cursor-pointer w-full max-w-[670px] h-[250px] group"
+      className="mt-4 flex flex-col items-center justify-center border-2 border-dashed border-[#8B6F47]/30 rounded-2xl p-12 bg-white/60 hover:bg-white/80 backdrop-blur-sm transition-all duration-300 cursor-pointer w-full max-w-[670px] h-[250px] group hover:border-[#8B6F47]/50"
       onClick={() => fileInputRef.current?.click()}
     >
       <input
@@ -70,11 +70,11 @@ export default function DreamPage() {
         className="hidden"
       />
       <div className="flex flex-col items-center">
-        <svg className="w-12 h-12 text-white/60 mb-4 group-hover:text-white/80 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-12 h-12 text-[#8B6F47]/60 mb-4 group-hover:text-[#8B6F47] group-hover:scale-110 transition-all duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
         </svg>
-        <p className="text-xl font-medium text-white/90">点击上传您的房间照片</p>
-        <p className="text-white/50 mt-2">支持 JPG, PNG 格式</p>
+        <p className="text-xl font-medium text-[#2D2D2D]">点击上传您的房间照片</p>
+        <p className="text-[#8A8A8A] mt-2">支持 JPG, PNG 格式</p>
       </div>
     </div>
   );
@@ -117,23 +117,15 @@ export default function DreamPage() {
   return (
     <div className="dream-page relative min-h-screen flex flex-col">
       <Header />
-      <main className="flex flex-1 w-full flex-col items-center justify-center text-center px-4 py-8">
-        {/* 动态背景层 */}
+      <main className="flex flex-1 w-full flex-col items-center justify-center text-center px-6 py-8">
+        {/* 温暖动态背景层 */}
         <div className="dream-background fixed inset-0 -z-10 pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e]" />
+          {/* 背景由 CSS 控制 */}
           <div className="absolute inset-0">
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
-            <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-cyan-500/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: "2s" }} />
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-600/[0.08] rounded-full blur-3xl animate-pulse" style={{ animationDelay: "0s" }} />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-600/[0.06] rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
+            <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-teal-500/[0.05] rounded-full blur-2xl animate-pulse" style={{ animationDelay: "4s" }} />
           </div>
-          {/* 网格纹理 */}
-          <div
-            className="absolute inset-0 opacity-[0.03]"
-            style={{
-              backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
-              backgroundSize: '40px 40px'
-            }}
-          />
         </div>
 
         <motion.div
@@ -143,29 +135,29 @@ export default function DreamPage() {
           className="relative z-10 w-full max-w-7xl"
         >
           <div className="flex items-center justify-between w-full mb-5">
-            <h1 className="font-display text-4xl font-bold tracking-normal text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 sm:text-6xl">
-              生成您的 <span className="text-white">梦想</span> 房间
+            <h1 className="font-display text-4xl font-bold tracking-normal text-[#2D2D2D] sm:text-6xl">
+              设计你的 <span className="text-[#8B6F47]">理想空间</span>
             </h1>
             <Link
               href="/"
-              className="group flex items-center space-x-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 hover:bg-white/20 transition-all duration-300"
+              className="group flex items-center space-x-2 px-4 py-2 bg-white/80 backdrop-blur-md rounded-xl border border-[#8B6F47]/20 hover:bg-white hover:border-[#8B6F47]/40 transition-all duration-300"
             >
-              <svg className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-[#8B6F47]/70 group-hover:text-[#8B6F47] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7v11m0 0l7 7" />
               </svg>
-              <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors">返回首页</span>
+              <span className="text-sm font-medium text-[#5A5A5A] group-hover:text-[#2D2D2D] transition-colors">返回首页</span>
             </Link>
           </div>
 
           {/* 模式切换按钮 */}
           <div className="flex justify-center space-x-2 mb-8">
-            <div className="bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
+            <div className="bg-white/60 backdrop-blur-md p-1.5 rounded-2xl border border-[#8B6F47]/15 shadow-sm">
               <button
                 onClick={() => setMode("generate")}
                 className={`px-8 py-3 rounded-xl font-medium transition-all duration-300 ${
                   mode === "generate"
-                    ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/25"
-                    : "text-white/70 hover:text-white hover:bg-white/5"
+                    ? "bg-[#8B6F47] text-white shadow-md"
+                    : "text-[#5A5A5A] hover:text-[#2D2D2D] hover:bg-white/50"
                 }`}
               >
                 快速生成
@@ -174,8 +166,8 @@ export default function DreamPage() {
                 onClick={() => setMode("chat")}
                 className={`px-8 py-3 rounded-xl font-medium transition-all duration-300 ${
                   mode === "chat"
-                    ? "bg-gradient-to-r from-purple-600 to-purple-500 text-white shadow-lg shadow-purple-500/25"
-                    : "text-white/70 hover:text-white hover:bg-white/5"
+                    ? "bg-[#7A9E7E] text-white shadow-md"
+                    : "text-[#5A5A5A] hover:text-[#2D2D2D] hover:bg-white/50"
                 }`}
               >
                 AI 问答
@@ -190,8 +182,8 @@ export default function DreamPage() {
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-medium transition-all duration-300 ${
                   sidebarOpen
-                    ? "bg-white/20 text-white"
-                    : "bg-white/10 text-white/70 hover:bg-white/20"
+                    ? "bg-white/80 text-[#2D2D2D]"
+                    : "bg-white/60 text-[#5A5A5A] hover:bg-white/80"
                 }`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -228,7 +220,20 @@ export default function DreamPage() {
                     {/* 主聊天区域 */}
                     <div className="flex-1 flex flex-col min-w-0 w-full">
                       {/* 聊天界面 */}
-                      <div className="flex-1 overflow-hidden rounded-2xl bg-white/5 backdrop-blur-md border border-white/10">
+                      <div className="flex-1 overflow-hidden rounded-2xl bg-white/60 backdrop-blur-md border border-[#8B6F47]/15">
+                        <ChatInterface
+                          onError={setError}
+                        />
+                        {error && (
+                          <div
+                            className="bg-red-500/20 border border-red-400/50 text-red-700 px-4 py-3 rounded-xl mt-4 backdrop-blur-sm"
+                            role="alert"
+                          >
+                            <span className="block sm:inline">{error}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                         <ChatInterface
                           onError={setError}
                         />
@@ -256,7 +261,7 @@ export default function DreamPage() {
                               height={30}
                               alt="步骤一"
                             />
-                            <p className="text-left font-medium text-white/90">
+                            <p className="text-left font-medium text-[#2D2D2D]">
                               选择您的装修风格。
                             </p>
                           </div>
@@ -276,7 +281,7 @@ export default function DreamPage() {
                               height={30}
                               alt="步骤二"
                             />
-                            <p className="text-left font-medium text-white/90">
+                            <p className="text-left font-medium text-[#2D2D2D]">
                               选择您的房间类型。
                             </p>
                           </div>
@@ -294,7 +299,7 @@ export default function DreamPage() {
                               height={30}
                               alt="步骤三"
                             />
-                            <p className="text-left font-medium text-white/90">
+                            <p className="text-left font-medium text-[#2D2D2D]">
                               上传一张您的房间照片。
                             </p>
                           </div>
@@ -302,8 +307,8 @@ export default function DreamPage() {
                       </>
                     )}
                     {restoredImage && (
-                      <div className="text-xl font-medium mb-4 text-white/90">
-                        这是为您改造后的 <b className="text-white">{roomLabels[room]}</b> ({themeLabels[theme]}风格)！
+                      <div className="text-xl font-medium mb-4 text-[#2D2D2D]">
+                        这是为您改造后的 <b className="text-[#8B6F47]">{roomLabels[room]}</b> ({themeLabels[theme]}风格)！
                       </div>
                     )}
                     <div className={`${
@@ -334,22 +339,22 @@ export default function DreamPage() {
                     {restoredImage && originalPhoto && !sideBySide && (
                       <div className="flex sm:space-x-4 sm:flex-row flex-col">
                         <div>
-                          <h2 className="mb-1 font-medium text-lg text-white/90">原始房间</h2>
+                          <h2 className="mb-1 font-medium text-lg text-[#2D2D2D]">原始房间</h2>
                           <Image
                             alt="原始房间照片"
                             src={originalPhoto}
-                            className="rounded-2xl relative w-full h-96 shadow-2xl"
+                            className="rounded-2xl relative w-full h-96 shadow-2xl image-card"
                             width={475}
                             height={475}
                           />
                         </div>
                         <div className="sm:mt-0 mt-8">
-                          <h2 className="mb-1 font-medium text-lg text-white/90">生成的房间</h2>
+                          <h2 className="mb-1 font-medium text-lg text-[#2D2D2D]">生成的房间</h2>
                           <a href={restoredImage} target="_blank" rel="noreferrer">
                             <Image
                               alt="生成后的房间照片"
                               src={restoredImage}
-                              className="rounded-2xl relative sm:mt-0 mt-2 cursor-zoom-in w-full h-96 shadow-2xl"
+                              className="rounded-2xl relative sm:mt-0 mt-2 cursor-zoom-in w-full h-96 shadow-2xl image-card"
                               width={475}
                               height={475}
                               onLoadingComplete={() => setRestoredLoaded(true)}
@@ -361,7 +366,7 @@ export default function DreamPage() {
                     {loading && (
                       <button
                         disabled
-                        className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-full text-white font-medium px-4 pt-2 pb-3 mt-8 w-40 shadow-lg shadow-blue-500/25"
+                        className="btn-warm bg-[#8B6F47] rounded-full text-white font-medium px-6 pt-2 pb-3 mt-8 w-40"
                       >
                         <span className="pt-4">
                           <LoadingDots color="white" style="large" />
@@ -370,7 +375,7 @@ export default function DreamPage() {
                     )}
                     {error && (
                       <div
-                        className="bg-red-500/20 border border-red-400/50 text-red-200 px-4 py-3 rounded-xl mt-8 backdrop-blur-sm"
+                        className="bg-red-500/20 border border-red-400/50 text-red-700 px-4 py-3 rounded-xl mt-8 backdrop-blur-sm"
                         role="alert"
                       >
                         <span className="block sm:inline">{error}</span>
@@ -385,7 +390,7 @@ export default function DreamPage() {
                             setRestoredLoaded(false);
                             setError(null);
                           }}
-                          className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white font-medium px-4 py-2 mt-8 hover:bg-white/20 transition"
+                          className="btn-warm bg-white/80 backdrop-blur-md border border-[#8B6F47]/20 rounded-full text-[#2D2D2D] font-medium px-6 py-2 mt-8 hover:bg-white"
                         >
                           重新生成
                         </button>
@@ -398,7 +403,7 @@ export default function DreamPage() {
                               appendNewToName(photoName!)
                             );
                           }}
-                          className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white font-medium px-4 py-2 mt-8 hover:bg-white/20 transition"
+                          className="btn-warm bg-[#8B6F47] backdrop-blur-md border border-[#8B6F47]/20 rounded-full text-white font-medium px-6 py-2 mt-8 hover:bg-[#A68B5B]"
                         >
                           下载生成的房间图片
                         </button>
