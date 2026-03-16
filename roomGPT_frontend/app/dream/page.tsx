@@ -131,7 +131,63 @@ export default function DreamPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      <Header />
+      {/* 顶部导航栏 */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-transparent border-b border-[#8B6F47]/10">
+        <div className="flex items-center justify-between w-full py-3 px-4 sm:px-6">
+          {/* 左侧：设计你的理想空间 */}
+          <h1 className="font-display text-lg font-bold tracking-normal text-[#2D2D2D] sm:text-xl">
+            设计你的{" "}
+            <span
+              className={`${dancingScript.className} text-lg sm:text-xl font-semibold italic bg-clip-text text-transparent`}
+              style={{
+                backgroundImage: 'linear-gradient(135deg, #E8B86D 0%, #8B6F47 25%, #7A9E7E 50%, #5B8A72 75%, #E8B86D 100%)',
+                textShadow: 'none',
+                letterSpacing: '0.02em',
+                WebkitBackgroundClip: 'text',
+                backgroundSize: '200% 200%',
+                animation: 'gradientFlow 3s ease infinite'
+              }}
+            >
+              理想空间
+            </span>
+          </h1>
+
+          {/* 中间：模式切换按钮 */}
+          <div className="bg-white/60 backdrop-blur-md p-1 rounded-xl border border-[#8B6F47]/15 shadow-sm">
+            <button
+              onClick={() => setMode("generate")}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-300 ${
+                mode === "generate"
+                  ? "bg-[#8B6F47] text-white shadow-md"
+                  : "text-[#5A5A5A] hover:text-[#2D2D2D] hover:bg-white/50"
+              }`}
+            >
+              快速生成
+            </button>
+            <button
+              onClick={() => setMode("chat")}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-300 ${
+                mode === "chat"
+                  ? "bg-[#7A9E7E] text-white shadow-md"
+                  : "text-[#5A5A5A] hover:text-[#2D2D2D] hover:bg-white/50"
+              }`}
+            >
+              AI 问答
+            </button>
+          </div>
+
+          {/* 右侧：返回首页按钮 */}
+          <Link
+            href="/"
+            className="group flex items-center space-x-1.5 px-3 py-1.5 bg-white/80 backdrop-blur-md rounded-lg border border-[#8B6F47]/20 hover:bg-white hover:border-[#8B6F47]/40 transition-all duration-300"
+          >
+            <svg className="w-4 h-4 text-[#8B6F47]/70 group-hover:text-[#8B6F47] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7v11m0 0l7 7" />
+            </svg>
+            <span className="text-xs font-medium text-[#5A5A5A] group-hover:text-[#2D2D2D] transition-colors">返回首页</span>
+          </Link>
+        </div>
+      </header>
       {/* 温暖动态背景层 */}
       <div className="dream-background fixed inset-0 -z-10 pointer-events-none">
         {/* 背景由 CSS 控制 */}
@@ -142,70 +198,15 @@ export default function DreamPage() {
         </div>
       </div>
 
-      <main className="flex-1 flex flex-col min-h-0 w-full px-4 sm:px-6 pt-4">
+      <main className="flex-1 flex flex-col min-h-0 w-full h-full pt-16">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="flex-1 flex flex-col min-h-0 w-full max-w-7xl mx-auto"
+          className="flex-1 flex flex-col min-h-0 w-full h-full"
         >
-          {/* 标题区域 */}
-          <div className="flex items-center justify-between w-full flex-shrink-0 pb-3 border-b border-[#8B6F47]/10">
-            <h1 className="font-display text-xl font-bold tracking-normal text-[#2D2D2D] sm:text-2xl">
-              设计你的{" "}
-              <span
-                className={`${dancingScript.className} text-xl sm:text-2xl font-semibold italic bg-clip-text text-transparent`}
-                style={{
-                  backgroundImage: 'linear-gradient(135deg, #E8B86D 0%, #8B6F47 25%, #7A9E7E 50%, #5B8A72 75%, #E8B86D 100%)',
-                  textShadow: 'none',
-                  letterSpacing: '0.02em',
-                  WebkitBackgroundClip: 'text',
-                  backgroundSize: '200% 200%',
-                  animation: 'gradientFlow 3s ease infinite'
-                }}
-              >
-                理想空间
-              </span>
-            </h1>
-            <Link
-              href="/"
-              className="group flex items-center space-x-2 px-4 py-2 bg-white/80 backdrop-blur-md rounded-xl border border-[#8B6F47]/20 hover:bg-white hover:border-[#8B6F47]/40 transition-all duration-300"
-            >
-              <svg className="w-5 h-5 text-[#8B6F47]/70 group-hover:text-[#8B6F47] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7v11m0 0l7 7" />
-              </svg>
-              <span className="text-sm font-medium text-[#5A5A5A] group-hover:text-[#2D2D2D] transition-colors">返回首页</span>
-            </Link>
-          </div>
-
-          {/* 模式切换按钮 */}
-          <div className="flex justify-center space-x-2 py-2 flex-shrink-0">
-            <div className="bg-white/60 backdrop-blur-md p-1 rounded-xl border border-[#8B6F47]/15 shadow-sm">
-              <button
-                onClick={() => setMode("generate")}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-300 ${
-                  mode === "generate"
-                    ? "bg-[#8B6F47] text-white shadow-md"
-                    : "text-[#5A5A5A] hover:text-[#2D2D2D] hover:bg-white/50"
-                }`}
-              >
-                快速生成
-              </button>
-              <button
-                onClick={() => setMode("chat")}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-300 ${
-                  mode === "chat"
-                    ? "bg-[#7A9E7E] text-white shadow-md"
-                    : "text-[#5A5A5A] hover:text-[#2D2D2D] hover:bg-white/50"
-                }`}
-              >
-                AI 问答
-              </button>
-            </div>
-          </div>
-
           {/* 聊天/快速生成内容区域 */}
-          <div className="flex-1 min-h-0 mt-2">
+          <div className="flex-1 min-h-0 relative z-10">
             <AnimatePresence mode="wait">
               <motion.div
                 key={mode}
@@ -213,7 +214,7 @@ export default function DreamPage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: mode === "chat" ? -20 : 20 }}
                 transition={{ duration: 0.3 }}
-                className="w-full"
+                className="w-full h-full"
               >
                 {mode === "chat" ? (
                   // 聊天模式 - 左侧常驻历史记录面板
@@ -258,7 +259,7 @@ export default function DreamPage() {
                     {/* 主聊天区域 */}
                     <div className="flex-1 flex flex-col min-w-0 min-h-0">
                       {/* 聊天界面 */}
-                      <div className="flex-1 overflow-hidden rounded-2xl bg-white/40 backdrop-blur-sm border border-[#8B6F47]/10">
+                      <div className="flex-1 overflow-hidden bg-white/40 backdrop-blur-sm">
                         <ChatInterface
                           onError={setError}
                         />
@@ -279,62 +280,66 @@ export default function DreamPage() {
                   </motion.div>
                 ) : (
                   // 快速生成模式
-                  <motion.div className="flex justify-between items-center w-full flex-col mt-4">
-                    {!restoredImage && (
-                      <>
-                        <div className="space-y-4 w-full max-w-sm">
-                          <div className="flex mt-3 items-center space-x-3">
-                            <Image
-                              src="/number-1-white.svg"
-                              width={30}
-                              height={30}
-                              alt="步骤一"
+                  <motion.div className="flex justify-center items-start w-full h-full overflow-y-auto">
+                    <div className="w-full max-w-2xl px-4 pt-16 pb-6 sm:pt-12 flex flex-col items-center">
+                      {!restoredImage && (
+                        <>
+                          <div className="space-y-4 w-full max-w-sm">
+                            <div className="flex mt-3 items-center space-x-3">
+                              <Image
+                                src="/number-1-white.svg"
+                                width={30}
+                                height={30}
+                                alt="步骤一"
+                              />
+                              <p className="text-left font-medium text-[#2D2D2D]">
+                                选择您的装修风格。
+                              </p>
+                            </div>
+                            <DropDown
+                              theme={theme}
+                              setTheme={(newTheme) =>
+                                setTheme(newTheme as typeof theme)
+                              }
+                              themes={themes}
                             />
-                            <p className="text-left font-medium text-[#2D2D2D]">
-                              选择您的装修风格。
-                            </p>
                           </div>
-                          <DropDown
-                            theme={theme}
-                            setTheme={(newTheme) =>
-                              setTheme(newTheme as typeof theme)
-                            }
-                            themes={themes}
-                          />
-                        </div>
-                        <div className="space-y-4 w-full max-w-sm">
-                          <div className="flex mt-10 items-center space-x-3">
-                            <Image
-                              src="/number-2-white.svg"
-                              width={30}
-                              height={30}
-                              alt="步骤二"
+                          <div className="space-y-4 w-full max-w-sm mt-6">
+                            <div className="flex items-center space-x-3">
+                              <Image
+                                src="/number-2-white.svg"
+                                width={30}
+                                height={30}
+                                alt="步骤二"
+                              />
+                              <p className="text-left font-medium text-[#2D2D2D]">
+                                选择您的房间类型。
+                              </p>
+                            </div>
+                            <DropDown
+                              theme={room}
+                              setTheme={(newRoom) => setRoom(newRoom as typeof room)}
+                              themes={rooms}
                             />
-                            <p className="text-left font-medium text-[#2D2D2D]">
-                              选择您的房间类型。
-                            </p>
                           </div>
-                          <DropDown
-                            theme={room}
-                            setTheme={(newRoom) => setRoom(newRoom as typeof room)}
-                            themes={rooms}
-                          />
-                        </div>
-                        <div className="mt-4 w-full max-w-sm">
-                          <div className="flex mt-6 w-96 items-center space-x-3">
-                            <Image
-                              src="/number-3-white.svg"
-                              width={30}
-                              height={30}
-                              alt="步骤三"
-                            />
-                            <p className="text-left font-medium text-[#2D2D2D]">
-                              上传一张您的房间照片。
-                            </p>
+                          <div className="mt-6 w-full max-w-sm">
+                            <div className="flex items-center space-x-3">
+                              <Image
+                                src="/number-3-white.svg"
+                                width={30}
+                                height={30}
+                                alt="步骤三"
+                              />
+                              <p className="text-left font-medium text-[#2D2D2D]">
+                                上传一张您的房间照片。
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </>
-                    )}
+                          <div className="w-full max-w-sm mt-4">
+                            <UploadDropZone />
+                          </div>
+                        </>
+                      )}
                     {restoredImage && (
                       <div className="text-xl font-medium mb-4 text-[#2D2D2D]">
                         这是为您改造后的 <b className="text-[#8B6F47]">{roomLabels[room]}</b> ({themeLabels[theme]}风格)！
@@ -355,7 +360,6 @@ export default function DreamPage() {
                         restored={restoredImage!}
                       />
                     )}
-                    {!originalPhoto && <UploadDropZone />}
                     {originalPhoto && !restoredImage && (
                       <Image
                         alt="原始房间照片"
@@ -410,7 +414,7 @@ export default function DreamPage() {
                         <span className="block sm:inline">{error}</span>
                       </div>
                     )}
-                    <div className="flex space-x-2 justify-center">
+                    <div className="flex space-x-2 justify-center mb-4">
                       {originalPhoto && !loading && (
                         <button
                           onClick={() => {
@@ -437,6 +441,7 @@ export default function DreamPage() {
                           下载生成的房间图片
                         </button>
                       )}
+                    </div>
                     </div>
                   </motion.div>
                 )}

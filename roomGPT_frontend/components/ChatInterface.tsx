@@ -507,13 +507,15 @@ export default function ChatInterface({ onError }: ChatInterfaceProps) {
         <QuickScenes onSelect={handleSelectScene} />
       )}
 
-      {/* 快捷提示词 */}
-      {!showQuickScenes && messages.length === 0 && (
-        <QuickPrompts onSelect={handleSelectQuickPrompt} />
-      )}
-
       {/* 输入区域 */}
-      <div className="flex-shrink-0 mt-4 p-4 bg-white/55 backdrop-blur-md rounded-2xl border border-[#8B6F47]/20">
+      <div className="flex-shrink-0 mt-2 p-3 bg-white/55 backdrop-blur-md rounded-2xl border border-[#8B6F47]/20">
+        {/* 快捷提示词 - 移到输入区域内 */}
+        {!showQuickScenes && messages.length === 0 && (
+          <div className="mb-2">
+            <QuickPrompts onSelect={handleSelectQuickPrompt} />
+          </div>
+        )}
+
         {/* 图片预览 */}
         {imagePreview && (
           <div className="mb-3 relative inline-block">
@@ -542,7 +544,7 @@ export default function ChatInterface({ onError }: ChatInterfaceProps) {
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="输入您的问题或描述装修需求..."
-              className="w-full bg-white/80 text-[#2D2D2D] rounded-xl px-4 py-3 pr-12 resize-none focus:outline-none focus:ring-2 focus:ring-[#8B6F47]/40 transition placeholder:text-[#8A8A8A]"
+              className="w-full bg-white/80 text-[#2D2D2D] rounded-xl px-4 py-2 pr-12 resize-none focus:outline-none focus:ring-2 focus:ring-[#8B6F47]/40 transition placeholder:text-[#8A8A8A]"
               rows={1}
               disabled={isSending}
             />
@@ -618,12 +620,12 @@ export default function ChatInterface({ onError }: ChatInterfaceProps) {
         </div>
 
         {/* 场景切换按钮 */}
-        <div className="flex items-center justify-between mt-3 mb-2 px-4 bg-white/55 rounded-xl border border-[#8B6F47]/20">
+        <div className="flex items-center justify-between mt-2 px-3 bg-white/55 rounded-xl border border-[#8B6F47]/20">
           <button
             onClick={() => setShowQuickScenes(!showQuickScenes)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/70 hover:bg-white border border-[#8B6F47]/20 transition text-xs text-[#5A5A5A] hover:text-[#2D2D2D]"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/70 hover:bg-white border border-[#8B6F47]/20 transition text-xs text-[#5A5A5A] hover:text-[#2D2D2D]"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2v12a2 2 0 01-2 2h12a2 2 0 01-2-2V6a2 2 0 01-2-2m2 4v2a2 2 0 002 2h12a2 2 0 002-2v-2M4 14h16" />
             </svg>
             <span>{showQuickScenes ? "返回输入" : "场景选择"}</span>

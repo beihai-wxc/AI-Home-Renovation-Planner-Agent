@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
-export default function Header() {
+interface HeaderProps {
+  variant?: "full" | "minimal";
+}
+
+export default function Header({ variant = "full" }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -47,27 +51,29 @@ export default function Header() {
           </motion.h1>
         </Link>
 
-        {/* 导航链接 */}
-        <nav className="flex items-center gap-6">
-          <Link
-            href="/"
-            className="text-sm font-medium text-[#5A5A5A] hover:text-[#8B6F47] transition-colors duration-300 link-underline"
-          >
-            首页
-          </Link>
-          <Link
-            href="/dream"
-            className="text-sm font-medium text-[#5A5A5A] hover:text-[#8B6F47] transition-colors duration-300 link-underline"
-          >
-            设计空间
-          </Link>
-          <Link
-            href="/#about"
-            className="text-sm font-medium text-[#5A5A5A] hover:text-[#8B6F47] transition-colors duration-300 link-underline"
-          >
-            关于我们
-          </Link>
-        </nav>
+        {/* 导航链接 - 仅在 full 模式显示 */}
+        {variant === "full" && (
+          <nav className="flex items-center gap-6">
+            <Link
+              href="/"
+              className="text-sm font-medium text-[#5A5A5A] hover:text-[#8B6F47] transition-colors duration-300 link-underline"
+            >
+              首页
+            </Link>
+            <Link
+              href="/dream"
+              className="text-sm font-medium text-[#5A5A5A] hover:text-[#8B6F47] transition-colors duration-300 link-underline"
+            >
+              设计空间
+            </Link>
+            <Link
+              href="/#about"
+              className="text-sm font-medium text-[#5A5A5A] hover:text-[#8B6F47] transition-colors duration-300 link-underline"
+            >
+              关于我们
+            </Link>
+          </nav>
+        )}
 
         <div className="text-[#8A8A8A] text-sm hidden sm:block">
           让每个家都有温度
