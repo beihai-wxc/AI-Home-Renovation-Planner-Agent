@@ -7,7 +7,6 @@ import Footer from "../components/Footer";
 import Header from "../components/Header";
 import LumiereIntro from "../components/LumiereIntro";
 import PairedCarousel, { PairedSlide } from "../components/PairedCarousel";
-import SquigglyLines from "../components/SquigglyLines";
 
 const pairedSlides: PairedSlide[] = [
   {
@@ -54,230 +53,278 @@ const pairedSlides: PairedSlide[] = [
   },
 ];
 
-const introCards = [
+const features = [
   {
-    title: "为什么做这个",
-    content:
-      "装修前最难的是提前看见结果，也很难把模糊想法讲清楚。这个项目希望把灵感更早变成可以讨论的可视化方案。",
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" strokeWidth="2" />
-        <circle cx="12" cy="12" r="6" strokeWidth="2" />
-        <circle cx="12" cy="12" r="2" strokeWidth="2" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
       </svg>
     ),
+    title: "智能空间分析",
+    description: "精准识别房间布局、采光条件和现有结构，为改造提供科学依据。",
   },
   {
-    title: "它如何工作",
-    content:
-      "上传当前房间图和灵感图后，多个 Agent 会分工完成空间分析、方案规划和结果汇总，而不是只返回一句泛泛建议。",
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
     ),
+    title: "个性化方案",
+    description: "根据您的偏好、预算和生活方式，生成专属的设计方案。",
   },
   {
-    title: "你最终会得到什么",
-    content:
-      "你会拿到效果图、设计建议、风格方向和下一步行动思路，让装修讨论更具体，也更容易推进落地。",
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     ),
+    title: "效果图生成",
+    description: "一键生成高质量改造效果图，让您提前预见理想家居。",
   },
 ];
 
 const agentShowcase = [
   {
     name: "视觉评估师",
-    title: "读取空间现状",
+    role: "空间分析专家",
     description: "识别房间布局、采光、问题点与可保留结构，也能吸收灵感图里的风格语言。",
     icon: "🔍",
-    accent: "from-[#F1D9B1] to-[#F7EEE0]",
   },
   {
     name: "设计规划师",
-    title: "生成风格方案",
-    description: "把预算、材料、配色和功能诉求整理成清晰可执行的设计方案，而不是一句模糊建议。",
+    role: "方案生成专家",
+    description: "把预算、材料、配色和功能诉求整理成清晰可执行的设计方案。",
     icon: "📋",
-    accent: "from-[#DCE9DB] to-[#F0F7EF]",
   },
   {
     name: "项目协调员",
-    title: "汇总并出效果图",
-    description: "整合前两位智能体的结果，输出装修路线、行动建议，并生成最终的改造效果图。",
+    role: "整合输出专家",
+    description: "整合前两位智能体的结果，输出装修路线、行动建议，并生成最终效果图。",
     icon: "⚙️",
-    accent: "from-[#E6D8C5] to-[#F7F1E7]",
   },
 ];
 
 export default function HomePage() {
   const [showIntro, setShowIntro] = useState(true);
 
-  return (
-    <div className="home-cinematic relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
-      {/* 温暖动态背景层 */}
-      <div className="dream-background fixed inset-0 -z-10 pointer-events-none">
-        {/* 主背景由 CSS 渐变控制 */}
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-600/[0.08] rounded-full blur-3xl animate-pulse" style={{ animationDelay: "0s" }} />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-600/[0.06] rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
-          <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-teal-500/[0.05] rounded-full blur-2xl animate-pulse" style={{ animationDelay: "4s" }} />
-        </div>
-      </div>
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
+  };
 
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: [0.25, 0.46, 0.45, 0.94],
+      },
+    },
+  };
+
+  return (
+    <div className="apple-gradient-bg min-h-screen">
       {showIntro && <LumiereIntro onComplete={() => setShowIntro(false)} />}
       <Header />
-      {/* 固定导航占位 */}
-      <div className="header-spacer" />
-      <main className="relative mt-10 flex w-full flex-1 flex-col items-center justify-center px-6 text-center sm:mt-12">
-        <motion.h1
-          initial={{ opacity: 0, y: 28 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.75 }}
-          className="mx-auto max-w-6xl font-display text-4xl font-bold tracking-tight text-[#2D2D2D] sm:text-7xl"
-        >
-          把你的家变成{" "}
-          <span className="relative whitespace-nowrap text-[#8B6F47]">
-            <SquigglyLines />
-            <span className="relative">理想的样子</span>
-          </span>
-        </motion.h1>
+      
+      <main>
+        {/* Hero Section */}
+        <section className="apple-section apple-hero-bg">
+          <div className="apple-container">
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="text-center"
+            >
+              <motion.h1
+                variants={itemVariants}
+                className="text-hero-xl font-semibold apple-text-gradient mb-6"
+              >
+                把你的家变成
+                <br />
+                <span className="text-apple-blue">理想的样子</span>
+              </motion.h1>
+              
+              <motion.p
+                variants={itemVariants}
+                className="text-xl text-apple-gray-500 max-w-2xl mx-auto mb-8 leading-relaxed"
+              >
+                上传房间照片，预览改造效果。
+                <br />
+                先看效果，再做决定，让装修方案更有把握。
+              </motion.p>
 
-        <motion.h2
-          initial={{ opacity: 0, y: 22 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.08 }}
-          className="mx-auto mt-7 max-w-4xl text-base leading-8 text-[#5A5A5A] sm:mt-10 sm:text-2xl"
-        >
-          上传房间照片，预览改造效果。<br className="hidden sm:block" />
-          先看效果，再做决定，让装修方案更有把握。
-        </motion.h2>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.16 }}
-        >
-          <Link
-            className="btn-warm mt-8 inline-flex rounded-2xl bg-[#8B6F47] px-8 py-4 text-lg font-semibold text-white transition-all duration-300 hover:bg-[#A68B5B]"
-            href="/dream"
-          >
-            开始设计你的空间
-          </Link>
-        </motion.div>
-
-        <motion.section
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.75, delay: 0.22 }}
-          className="mt-8 w-full max-w-6xl"
-        >
-          <div className="rounded-[28px] border border-[#8B6F47]/12 bg-white/70 px-5 py-5 shadow-[0_18px_60px_rgba(139,111,71,0.08)] backdrop-blur-md sm:px-7 sm:py-6">
-            <div className="grid gap-5 text-left lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)] lg:items-start lg:gap-8">
-              <div className="max-w-3xl">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-[#A28962]">
-                  Multi-Agent Workflow
-                </p>
-                <h3 className="cn-latin-heading mt-3 max-w-2xl text-[2rem] font-semibold leading-[1.16] tracking-[-0.02em] text-[#2D2D2D] sm:text-[2.55rem]">
-                  从房间分析到效果图生成，3 个 Agent 各司其职
-                </h3>
-              </div>
-              <div className="max-w-lg lg:pt-8">
-                <p className="cn-latin-copy text-base leading-8 text-[#6B6459] sm:text-[1.05rem]">
-                  从看懂你的房间，到生成方案，再到输出效果图，整个过程由分工明确的智能体协作完成。
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {agentShowcase.map((agent, index) => (
-                <motion.article
-                  key={agent.name}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.28 + index * 0.08 }}
-                  className="relative overflow-hidden rounded-3xl border border-[#8B6F47]/10 bg-white p-5 text-left shadow-sm"
+              <motion.div variants={itemVariants}>
+                <Link
+                  href="/dream"
+                  className="apple-btn apple-btn-primary inline-flex items-center space-x-2 text-lg px-8 py-4"
                 >
-                  <div className={`absolute inset-x-0 top-0 h-24 bg-gradient-to-br ${agent.accent} opacity-90`} />
-                  <div className="relative">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-xl shadow-sm">
-                          {agent.icon}
-                        </div>
-                        <p className="cn-latin-heading text-[1.22rem] font-bold leading-none text-[#6E532F] sm:text-[1.28rem]">
-                          {agent.name}
-                        </p>
-                      </div>
-                      <span className="agent-index-label text-[11px] font-semibold uppercase text-[#8D724E]">
-                        Agent 0{index + 1}
-                      </span>
-                    </div>
-                    <h4 className="cn-latin-heading mt-10 text-[1.58rem] font-semibold leading-[1.18] tracking-[-0.01em] text-[#2D2D2D] sm:text-[1.68rem]">
-                      {agent.title}
-                    </h4>
-                    <p className="cn-latin-copy mt-3 text-[15px] leading-8 text-[#5A5A5A]">{agent.description}</p>
-                  </div>
-                </motion.article>
-              ))}
-            </div>
+                  <span>开始设计你的空间</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </Link>
+              </motion.div>
+            </motion.div>
           </div>
-        </motion.section>
+        </section>
 
-        <motion.section
-          initial={{ opacity: 0, y: 26 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.75, delay: 0.24 }}
-          className="mt-10 w-full sm:mt-14"
-        >
-          <PairedCarousel pairs={pairedSlides} interval={4000} />
-        </motion.section>
-
-        <section id="about" className="mt-12 w-full pb-10 sm:mt-16 sm:pb-16 px-6">
-          <div className="mx-auto max-w-6xl text-left">
-            <motion.h3
-              initial={{ opacity: 0, y: 18 }}
+        {/* Features Section */}
+        <section className="apple-section bg-white">
+          <div className="apple-container">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
-              transition={{ duration: 0.55 }}
-              className="text-center text-2xl font-semibold text-[#2D2D2D] sm:text-3xl"
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="text-center mb-16"
             >
-              这个项目能帮你什么
-            </motion.h3>
-            <motion.p
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.55, delay: 0.08 }}
-              className="mx-auto mt-4 max-w-3xl text-center text-base leading-7 text-[#5A5A5A] sm:text-lg"
-            >
-              它想解决的是装修前“看不见、说不清、难落地”的问题，把灵感更早变成可以讨论的方案。
-            </motion.p>
+              <h2 className="text-hero-md font-semibold apple-text-gradient mb-4">
+                强大的 AI 设计能力
+              </h2>
+              <p className="text-lg text-apple-gray-500 max-w-xl mx-auto">
+                三个专业智能体协作，从分析到出图，一站式解决您的装修设计需求。
+              </p>
+            </motion.div>
 
-            <div className="mt-7 grid grid-cols-1 gap-5 sm:mt-10 md:grid-cols-3">
-              {introCards.map((card, index) => (
-                <motion.article
-                  key={card.title}
-                  initial={{ opacity: 0, y: 18 }}
+            <div className="apple-grid apple-grid-3">
+              {features.map((feature, index) => (
+                <motion.div
+                  key={feature.title}
+                  initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ duration: 0.5, delay: 0.1 * index }}
-                  className="intro-zoom-card rounded-2xl border border-[#8B6F47]/15 bg-white p-6 backdrop-blur-sm transition hover:border-[#8B6F47]/35"
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                  className="apple-card p-8 text-center group"
                 >
-                  <div className="card-icon text-[#8B6F47] mb-4 transition-transform duration-300">
-                    {card.icon}
+                  <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-apple-gray-100 flex items-center justify-center text-apple-blue group-hover:scale-110 transition-transform duration-300">
+                    {feature.icon}
                   </div>
-                  <h4 className="text-lg font-semibold text-[#8B6F47]">{card.title}</h4>
-                  <p className="mt-3 text-sm leading-7 text-[#5A5A5A]">{card.content}</p>
-                </motion.article>
+                  <h3 className="text-lg font-semibold text-apple-black mb-3">
+                    {feature.title}
+                  </h3>
+                  <p className="text-sm text-apple-gray-500 leading-relaxed">
+                    {feature.description}
+                  </p>
+                </motion.div>
               ))}
             </div>
           </div>
         </section>
+
+        {/* Agent Showcase Section */}
+        <section className="apple-section bg-apple-gray-100">
+          <div className="apple-container">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-hero-md font-semibold apple-text-gradient mb-4">
+                多智能体协作系统
+              </h2>
+              <p className="text-lg text-apple-gray-500 max-w-xl mx-auto">
+                从房间分析到效果图生成，3 个 Agent 各司其职，专业分工协作。
+              </p>
+            </motion.div>
+
+            <div className="apple-grid apple-grid-3">
+              {agentShowcase.map((agent, index) => (
+                <motion.div
+                  key={agent.name}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                  className="apple-card p-8 text-center"
+                >
+                  <div className="text-4xl mb-4">{agent.icon}</div>
+                  <div className="text-xs font-medium text-apple-blue mb-2 uppercase tracking-wider">
+                    {agent.role}
+                  </div>
+                  <h3 className="text-lg font-semibold text-apple-black mb-3">
+                    {agent.name}
+                  </h3>
+                  <p className="text-sm text-apple-gray-500 leading-relaxed">
+                    {agent.description}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Gallery Section */}
+        <section className="apple-section bg-white">
+          <div className="apple-container">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-hero-md font-semibold apple-text-gradient mb-4">
+                看看改造效果
+              </h2>
+              <p className="text-lg text-apple-gray-500 max-w-xl mx-auto">
+                真实案例展示，看看 AI 如何将普通空间变成理想家居。
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              <PairedCarousel pairs={pairedSlides} interval={4000} />
+            </motion.div>
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section id="about" className="apple-section bg-apple-black">
+          <div className="apple-container">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="text-center"
+            >
+              <h2 className="text-hero-md font-semibold text-white mb-6">
+                准备好改造你的家了吗？
+              </h2>
+              <p className="text-lg text-apple-gray-400 max-w-xl mx-auto mb-8">
+                上传一张房间照片，让 AI 帮你预见理想家居的样子。
+              </p>
+              <Link
+                href="/dream"
+                className="apple-btn bg-white text-apple-black hover:bg-apple-gray-100 inline-flex items-center space-x-2 text-lg px-8 py-4"
+              >
+                <span>免费开始设计</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </Link>
+            </motion.div>
+          </div>
+        </section>
       </main>
+
       <Footer />
     </div>
   );

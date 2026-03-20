@@ -359,13 +359,13 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
               exit={{ opacity: 0, y: -10 }}
               className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"} mb-2`}
             >
-              <div
-                className={`group ${
-                  message.role === "user"
-                    ? "max-w-[60%] sm:max-w-[50%] bg-gradient-to-r from-[#D4A652] to-[#8B6F47] text-white rounded-2xl rounded-br-sm shadow-lg shadow-[#8B6F47]/20"
-                    : "max-w-[85%] bg-white/70 backdrop-blur-md text-[#2D2D2D] rounded-2xl rounded-bl-sm border border-[#8B6F47]/20 relative overflow-hidden"
-                } p-3 sm:p-4`}
-              >
+                <div
+                  className={`group ${
+                    message.role === "user"
+                      ? "max-w-[60%] sm:max-w-[50%] bg-apple-blue text-white rounded-2xl rounded-br-sm shadow-apple"
+                      : "max-w-[85%] bg-white/90 backdrop-blur-md text-apple-black rounded-2xl rounded-bl-sm border border-apple-gray-200/50 relative overflow-hidden shadow-apple"
+                  } p-3 sm:p-4`}
+                >
                 {message.role === "assistant" && (
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#D4A652] via-[#8B6F47] to-[#7A9E7E]" />
                 )}
@@ -480,10 +480,10 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
 
         {isSending && messages[messages.length - 1]?.role === "assistant" && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-            <div className="bg-white/70 backdrop-blur-md rounded-2xl rounded-bl-sm p-4 border border-[#8B6F47]/20">
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl rounded-bl-sm p-4 border border-apple-gray-200/50 shadow-apple">
               <div className="flex items-center space-x-2">
-                <LoadingDots color="#8B6F47" style="small" />
-                <span className="text-sm text-[#5A5A5A]">AI 正在回复...</span>
+                <LoadingDots color="#0071e3" style="small" />
+                <span className="text-sm text-apple-gray-500">AI 正在回复...</span>
               </div>
             </div>
           </motion.div>
@@ -498,7 +498,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
         </div>
       )}
 
-      <div className="flex-shrink-0 mt-2 p-3 bg-white/50 backdrop-blur-md rounded-2xl border border-[#8B6F47]/15">
+      <div className="flex-shrink-0 mt-2 p-3 bg-white/80 backdrop-blur-md rounded-2xl border border-apple-gray-200/50 shadow-apple">
         {failedDraft && (
           <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50/85 px-3 py-2 text-sm text-red-700">
             <span>刚才那条消息发送失败了，内容和图片已保留，可以直接重新发送。</span>
@@ -611,7 +611,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="输入您的问题或描述装修需求..."
-              className="w-full min-h-[56px] bg-white/85 text-[#2D2D2D] rounded-2xl px-4 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-[#8B6F47]/40 transition placeholder:text-[#8A8A8A] border border-[#8B6F47]/15"
+              className="w-full min-h-[56px] bg-white text-apple-black rounded-2xl px-4 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-apple-blue/40 transition placeholder:text-apple-gray-400 border border-apple-gray-200/50"
               rows={2}
               disabled={isSending}
             />
@@ -645,8 +645,8 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
             disabled={isSending || (!input.trim() && !currentRoomImage && !inspirationImage)}
             className={`min-w-[82px] self-stretch rounded-2xl px-5 py-3 text-sm font-medium transition-all duration-300 ${
               isSending || (!input.trim() && !currentRoomImage && !inspirationImage)
-                ? "bg-white/60 text-[#8A8A8A] cursor-not-allowed"
-                : "bg-gradient-to-r from-[#8B6F47] to-[#A68B5B] text-white shadow-lg shadow-[#8B6F47]/25 hover:shadow-[#8B6F47]/40"
+                ? "bg-apple-gray-200 text-apple-gray-400 cursor-not-allowed"
+                : "bg-apple-blue text-white shadow-apple hover:bg-apple-blue-hover hover:shadow-apple-lg"
             }`}
           >
             {isSending ? "发送中" : "发送"}
