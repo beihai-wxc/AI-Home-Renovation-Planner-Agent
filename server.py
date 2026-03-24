@@ -6,14 +6,14 @@ import re
 import uuid
 from html import unescape
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from urllib.request import urlopen
 from typing import Any, AsyncGenerator, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 from agent import project_coordinator, root_agent
@@ -422,11 +422,6 @@ def strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", unescape(cleaned)).strip()
 
 
-def to_public_url(file_path: Path) -> str:
-    relative = file_path.relative_to(FRONTEND_PUBLIC_ROOT)
-    return "/" + str(relative).replace("\\", "/")
-
-
 def find_existing_file_by_stem(directory: Path, stem: str) -> Optional[Path]:
     if not directory.exists():
         return None
@@ -441,17 +436,49 @@ def find_existing_file_by_stem(directory: Path, stem: str) -> Optional[Path]:
     return None
 
 
+def find_existing_file_by_name(directory: Path, filename: str) -> Optional[Path]:
+    if not directory.exists():
+        return None
+    target = filename.strip()
+    if not target:
+        return None
+    exact = directory / target
+    if exact.exists() and exact.is_file():
+        return exact
+    lowered = target.lower()
+    for candidate in directory.iterdir():
+        if candidate.is_file() and candidate.name.lower() == lowered:
+            return candidate
+    return None
+
+
 def resolve_local_image_dirs() -> tuple[Path, Path]:
     original_dir = LOCAL_ORIGINAL_DIR
     rendered_dir = LOCAL_RENDERED_DIR
     if original_dir.exists() and rendered_dir.exists():
         return original_dir, rendered_dir
 
-    cwd = FRONTEND_PUBLIC_ROOT if FRONTEND_PUBLIC_ROOT.exists() else Path(os.getcwd())
-    subdirs = [p for p in cwd.iterdir() if p.is_dir()]
+    search_roots: list[Path] = []
+    if FRONTEND_PUBLIC_ROOT.exists():
+        search_roots.append(FRONTEND_PUBLIC_ROOT)
+    search_roots.append(Path(os.getcwd()))
+
+    def scan_dirs(root: Path) -> list[Path]:
+        found: list[Path] = []
+        try:
+            for path in root.rglob("*"):
+                if path.is_dir():
+                    found.append(path)
+        except Exception:
+            return found
+        return found
+
+    all_dirs: list[Path] = []
+    for root in search_roots:
+        all_dirs.extend(scan_dirs(root))
 
     def find_dir(keyword: str) -> Optional[Path]:
-        for folder in subdirs:
+        for folder in all_dirs:
             if keyword in folder.name:
                 return folder
         return None
@@ -487,8 +514,8 @@ def resolve_local_render_mapping(
         if not rendered:
             return {"image_url": None, "message": f"未找到与 {stem} 对应的渲染图（期望 {mapped_stem}）。"}
         return {
-            "image_url": to_public_url(rendered),
-            "original_url": to_public_url(original) if original else None,
+            "image_filename": rendered.name,
+            "original_filename": original.name if original else None,
             "message": None,
         }
 
@@ -498,7 +525,7 @@ def resolve_local_render_mapping(
     rendered = find_existing_file_by_stem(rendered_dir, style_key)
     if not rendered:
         return {"image_url": None, "message": f"未找到风格示例图：{style_key}。"}
-    return {"image_url": to_public_url(rendered), "original_url": None, "message": None}
+    return {"image_filename": rendered.name, "original_filename": None, "message": None}
 
 
 async def google_cse_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
@@ -582,6 +609,45 @@ def build_recommended_prompts_from_sessions(sessions: list[dict[str, Any]], limi
             "我想先改造卧室，怎么排施工顺序更合适？",
         ]
     return prompts[:limit]
+
+
+def build_non_image_guarded_prompt(message: str) -> str:
+    text = (message or "").strip()
+    if not text:
+        return text
+
+    room_keywords = [
+        "客厅",
+        "卧室",
+        "厨房",
+        "餐厅",
+        "书房",
+        "办公室",
+        "卫生间",
+        "浴室",
+        "玄关",
+        "阳台",
+        "儿童房",
+    ]
+    vague_keywords = [
+        "这套方案",
+        "预算拆分",
+        "预算明细",
+        "材料清单",
+        "报价",
+        "给出预算",
+    ]
+    if any(keyword in text for keyword in room_keywords):
+        return text
+    if not any(keyword in text for keyword in vague_keywords):
+        return text
+
+    guidance = (
+        "补充约束：当前没有上传房间图片，也没有明确房间类型。"
+        "请先给通用预算/材料拆分模板，不要擅自假设是厨房或其他具体空间，"
+        "并在结尾提醒用户补充房间类型、面积和城市。"
+    )
+    return f"{text}\n\n{guidance}"
 
 
 def build_render_completion_message(success: bool, details: str | None = None) -> str:
@@ -798,16 +864,48 @@ async def google_links_endpoint(payload: GoogleLinksRequest):
 
 @app.post("/api/local-render-map", response_model=LocalRenderResponse)
 async def local_render_map_endpoint(
+    request: Request,
     original_filename: str = Form(""),
     style: str = Form(""),
 ):
     mapping = resolve_local_render_mapping(original_filename=original_filename, style=style)
+    image_filename = mapping.get("image_filename")
+    original_filename_mapped = mapping.get("original_filename")
+    image_url = (
+        str(request.url_for("local_file_asset", kind="rendered", filename=quote(image_filename)))
+        if image_filename
+        else None
+    )
+    original_url = (
+        str(request.url_for("local_file_asset", kind="original", filename=quote(original_filename_mapped)))
+        if original_filename_mapped
+        else None
+    )
     return LocalRenderResponse(
         mode=IMAGE_GENERATION_MODE,
-        imageUrl=mapping.get("image_url"),
-        originalImageUrl=mapping.get("original_url"),
+        imageUrl=image_url,
+        originalImageUrl=original_url,
         message=mapping.get("message"),
     )
+
+
+@app.get("/api/local-files/{kind}/{filename:path}", name="local_file_asset")
+async def local_file_asset(kind: str, filename: str):
+    original_dir, rendered_dir = resolve_local_image_dirs()
+    if kind not in {"original", "rendered"}:
+        raise HTTPException(status_code=404, detail="Invalid local file kind.")
+    directory = original_dir if kind == "original" else rendered_dir
+    safe_name = Path(filename).name
+    file_path = find_existing_file_by_name(directory, safe_name)
+    if not file_path:
+        raise HTTPException(status_code=404, detail="Local file not found.")
+    suffix = file_path.suffix.lower()
+    media_type = "image/png"
+    if suffix in {".jpg", ".jpeg"}:
+        media_type = "image/jpeg"
+    elif suffix == ".webp":
+        media_type = "image/webp"
+    return FileResponse(str(file_path), media_type=media_type)
 
 
 @app.post("/api/sessions/{session_id}/pin")
@@ -905,7 +1003,8 @@ async def chat_endpoint(request: Request, payload: ChatRequest):
     try:
         from google.genai import types
 
-        message_content = types.Content(role="user", parts=[types.Part.from_text(text=payload.message)])
+        guarded_message = build_non_image_guarded_prompt(payload.message)
+        message_content = types.Content(role="user", parts=[types.Part.from_text(text=guarded_message)])
         events = runner.run_async(
             user_id=payload.user_id,
             session_id=payload.session_id,
@@ -914,9 +1013,9 @@ async def chat_endpoint(request: Request, payload: ChatRequest):
         reply_text = await extract_reply_text(events)
         result_filename = await get_result_image_filename(payload.user_id, payload.session_id)
         references = []
-        if should_include_price_links(payload.message, reply_text):
+        if should_include_price_links(guarded_message, reply_text):
             references = await google_cse_search(
-                f"{payload.message} 装修 价格 材料 购买",
+                f"{guarded_message} 装修 价格 材料 购买",
                 max_results=5,
             )
         persist_chat_records(
@@ -948,7 +1047,8 @@ async def chat_stream_endpoint(payload: ChatRequest):
     try:
         from google.genai import types
 
-        message_content = types.Content(role="user", parts=[types.Part.from_text(text=payload.message)])
+        guarded_message = build_non_image_guarded_prompt(payload.message)
+        message_content = types.Content(role="user", parts=[types.Part.from_text(text=guarded_message)])
         events = runner.run_async(
             user_id=payload.user_id,
             session_id=payload.session_id,
@@ -987,9 +1087,9 @@ async def chat_stream_endpoint(payload: ChatRequest):
                 "".join(final_reply_texts) or "".join(partial_reply_chunks)
             )
             references: list[dict[str, str]] = []
-            if should_include_price_links(payload.message, assistant_message):
+            if should_include_price_links(guarded_message, assistant_message):
                 references = await google_cse_search(
-                    f"{payload.message} 装修 价格 材料 购买",
+                    f"{guarded_message} 装修 价格 材料 购买",
                     max_results=5,
                 )
                 if references:
@@ -1033,8 +1133,9 @@ async def chat_with_image_endpoint(
     await ensure_adk_session(user_id=user_id, session_id=session_id)
 
     try:
+        effective_message = message if (current_room_image or image) else build_non_image_guarded_prompt(message)
         message_content, _uploaded_assets = await prepare_message_content(
-            message=message,
+            message=effective_message,
             user_id=user_id,
             session_id=session_id,
             current_room_image=current_room_image,
@@ -1048,9 +1149,9 @@ async def chat_with_image_endpoint(
         reply_text = await extract_reply_text(events)
         result_filename = await get_result_image_filename(user_id, session_id)
         references = []
-        if should_include_price_links(message, reply_text):
+        if should_include_price_links(effective_message, reply_text):
             references = await google_cse_search(
-                f"{message} 装修 价格 材料 购买",
+                f"{effective_message} 装修 价格 材料 购买",
                 max_results=5,
             )
         persist_chat_records(
@@ -1087,8 +1188,9 @@ async def chat_with_image_stream_endpoint(
     await ensure_adk_session(user_id=user_id, session_id=session_id)
 
     try:
+        effective_message = message if (current_room_image or image) else build_non_image_guarded_prompt(message)
         message_content, _uploaded_assets = await prepare_message_content(
-            message=message,
+            message=effective_message,
             user_id=user_id,
             session_id=session_id,
             current_room_image=current_room_image,
@@ -1132,9 +1234,9 @@ async def chat_with_image_stream_endpoint(
                 "".join(final_reply_texts) or "".join(partial_reply_chunks)
             )
             references: list[dict[str, str]] = []
-            if should_include_price_links(message, assistant_message):
+            if should_include_price_links(effective_message, assistant_message):
                 references = await google_cse_search(
-                    f"{message} 装修 价格 材料 购买",
+                    f"{effective_message} 装修 价格 材料 购买",
                     max_results=5,
                 )
                 if references:

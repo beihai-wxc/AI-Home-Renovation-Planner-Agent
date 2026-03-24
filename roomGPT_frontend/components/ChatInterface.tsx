@@ -387,7 +387,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
                   <button
                     key={prompt}
                     type="button"
-                    onClick={() => handleSendMessage(prompt)}
+                    onClick={() => setInput(prompt)}
                     className="rounded-full border border-[#8B6F47]/20 bg-white px-3 py-1.5 text-xs text-[#5A5A5A] transition hover:bg-[#F9F4EC] hover:text-[#2D2D2D]"
                   >
                     {prompt}
@@ -550,7 +550,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
                         <button
                           key={`${message.id}-${prompt}`}
                           type="button"
-                          onClick={() => handleSendMessage(prompt)}
+                          onClick={() => setInput(prompt)}
                           className="rounded-full border border-[#8B6F47]/20 bg-white px-3 py-1.5 text-xs text-[#5A5A5A] transition hover:bg-[#F9F4EC] hover:text-[#2D2D2D]"
                         >
                           {prompt}

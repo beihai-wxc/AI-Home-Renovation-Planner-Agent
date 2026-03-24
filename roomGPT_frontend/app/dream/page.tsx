@@ -171,13 +171,14 @@ export default function DreamPage() {
     setRestoredLoaded(false);
     setLoading(true);
     setError(null);
-    setSideBySide(Boolean(file));
+    setSideBySide(false);
 
     try {
       const mapped = await mapLocalRenderImage(file?.name ?? null, themeLabels[theme]);
       if (!mapped.imageUrl) {
         setRestoredImage(null);
-        setError(mapped.message || "未匹配到本地渲染图。");
+        // 本地匹配失败时静默处理，不向前端展示错误提示。
+        console.warn("local render mapping not found", mapped.message || "no mapping");
         return;
       }
       if (!file && mapped.originalImageUrl) {
@@ -188,7 +189,8 @@ export default function DreamPage() {
       }
       setRestoredImage(mapped.imageUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "本地图片映射失败。");
+      // 本地映射异常时静默处理，避免在界面显示匹配失败信息。
+      console.warn("local render mapping failed", err);
     } finally {
       setLoading(false);
     }

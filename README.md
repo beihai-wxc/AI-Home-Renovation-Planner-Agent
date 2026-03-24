@@ -4,10 +4,10 @@
 
 ## ✨ 核心特色与架构重构
 
-本项目基于最初的 Google ADK 核心智能体逻辑进行了**彻底的前后端分离重构**，并已将前端替换为 `roomGPT_frontend`（Next.js）：
+本项目基于核心智能体逻辑进行了**彻底的前后端分离重构**，前端为 `roomGPT_frontend`（Next.js）：
 
 *   **🎨 全新前端 (Next.js + roomGPT)**:
-   *   采用 roomGPT 前端交互体验，并完成面向中文用户的文案改造。
+   *   采用 roomGPT 前端交互体验，实现面向中文用户的文案。
    *   前端直接对接本地 FastAPI 接口（`/api/chat-with-image`）。
 *   **⚙️ 纯净 API 后端 (Python + FastAPI)**:
     *   将 ADK Agent 逻辑通过 FastAPI 封装为标准的 RESTful API 接口。
@@ -17,7 +17,7 @@
 ## 功能特性
 
 - **🔍 智能图像分析**: 上传房间现状照片和心仪的灵感参考图 —— 智能体将自动检测并综合分析它们
-- **🎨 照片级逼真渲染**: 使用 Gemini 3 Pro 为您翻新后的空间生成具有专业水准的精美渲染图
+- **🎨 照片级逼真渲染**: 使用 大模型 为您翻新后的空间生成具有专业水准的精美渲染图
 - **💰 预算感知规划**: 根据您的预算限制量身定制装修建议
 - **📊 完整的装修路线图**: 提供时间进度表、详细的预算明细、承包商清单以及具体的行动执行清单
 - **🤖 多智能体协同编排**: 演示了“协调者(Coordinator)/分发者(Dispatcher) + 顺序流水线(Sequential Pipeline)”的智能体设计模式
@@ -50,11 +50,6 @@
 ```bash
 # 安装基础依赖
 pip install -r requirements.txt
-
-# 配置核心大模型 API Key
-# 复制 .env.example 为 .env，然后填入本地可用的 GOOGLE_API_KEY
-# Windows PowerShell 也可以临时设置：
-$env:GOOGLE_API_KEY="your_gemini_api_key"
 
 # 启动服务 (默认运行在 8000 端口)
 python -m uvicorn server:app --host 0.0.0.0 --port 8000
@@ -89,7 +84,7 @@ npm run dev
 ```
 → 智能体会分析您的空间，给出具有性价比的改进建议，并生成全新的渲染图
 
-### 场景 2: 房间照片 + 设计灵感图
+### 场景 2: 房间照片 + 设计灵感图             （暂时未实现）
 ```
 [上传图片 1: 您的实际厨房]
 [上传图片 2: 从 Pinterest 找来的灵感图]
