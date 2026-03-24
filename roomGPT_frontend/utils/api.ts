@@ -5,13 +5,19 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:80
 const DEFAULT_USER_ID = "frontend_user";
 
 interface StreamChunk {
-  type?: "content" | "image" | "agent" | "render" | "error";
+  type?: "content" | "image" | "agent" | "render" | "error" | "references";
   content?: string;
   url?: string;
   agentName?: string;
   status?: "idle" | "processing" | "completed" | "error";
   jobId?: string;
   message?: string;
+  links?: Array<{
+    title: string;
+    url: string;
+    snippet?: string;
+    source?: string;
+  }>;
 }
 
 interface ImagePayload {
@@ -23,6 +29,12 @@ function buildChatMessage(data: {
   role: "user" | "assistant";
   content: string;
   imageUrl?: string | null;
+  references?: Array<{
+    title: string;
+    url: string;
+    snippet?: string;
+    source?: string;
+  }>;
   created_at?: string;
 }): ChatMessage {
   return {
@@ -30,6 +42,7 @@ function buildChatMessage(data: {
     role: data.role,
     content: data.content,
     imageUrl: data.imageUrl || undefined,
+    references: data.references || undefined,
     timestamp: data.created_at ? new Date(data.created_at) : new Date(),
   };
 }
@@ -133,6 +146,7 @@ export async function fetchSessionMessages(sessionId: string): Promise<ChatMessa
       role: message.role,
       content: message.content,
       imageUrl: message.imageUrl,
+      references: message.references,
       created_at: message.created_at,
     })
   );
@@ -167,6 +181,7 @@ export async function sendChatMessageStream(
   message: string,
   onChunk: (content: string) => void,
   onAgent: (agentName: string, status: "idle" | "processing" | "completed" | "error") => void,
+  onReferences: (links: Array<{ title: string; url: string; snippet?: string; source?: string }>) => void,
   onDone: () => void,
   onError: (error: string) => void,
   sessionId: string
@@ -198,6 +213,10 @@ export async function sendChatMessageStream(
           onError(chunk.message);
           return;
         }
+        if (chunk.type === "references" && chunk.links) {
+          onReferences(chunk.links);
+          return;
+        }
         if (chunk.content) {
           onChunk(chunk.content);
         }
@@ -215,6 +234,7 @@ export async function sendChatWithImageStream(
   onChunk: (content: string) => void,
   onAgent: (agentName: string, status: "idle" | "processing" | "completed" | "error") => void,
   onImage: (url: string) => void,
+  onReferences: (links: Array<{ title: string; url: string; snippet?: string; source?: string }>) => void,
   onRenderQueued: (jobId: string) => void,
   onDone: () => void,
   onError: (error: string) => void,
@@ -256,6 +276,10 @@ export async function sendChatWithImageStream(
         }
         if (chunk.type === "render" && chunk.jobId) {
           onRenderQueued(chunk.jobId);
+          return;
+        }
+        if (chunk.type === "references" && chunk.links) {
+          onReferences(chunk.links);
           return;
         }
 
@@ -304,6 +328,36 @@ export async function requestRenderJob(
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || error.message || "创建渲染任务失败");
+  }
+  return await response.json();
+}
+
+export async function fetchRecommendedPrompts(limit = 6): Promise<string[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/sessions/recommended-prompts?user_id=${DEFAULT_USER_ID}&limit=${limit}`
+  );
+  if (!response.ok) {
+    throw new Error("加载推荐问题失败");
+  }
+  const data = await response.json();
+  return Array.isArray(data.prompts) ? data.prompts : [];
+}
+
+export async function mapLocalRenderImage(
+  originalFilename: string | null,
+  style: string
+): Promise<{ imageUrl?: string; originalImageUrl?: string; message?: string; mode: string }> {
+  const formData = new FormData();
+  formData.append("original_filename", originalFilename || "");
+  formData.append("style", style);
+
+  const response = await fetch(`${API_BASE_URL}/api/local-render-map`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || error.message || "本地图片映射失败");
   }
   return await response.json();
 }

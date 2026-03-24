@@ -12,12 +12,13 @@ import Toggle from "../../components/Toggle";
 import ChatInterface from "../../components/ChatInterface";
 import ChatHistoryPanel from "../../components/ChatHistoryPanel";
 import Skeleton from "../../components/Skeleton";
+import ImageLightbox from "../../components/ImageLightbox";
 import appendNewToName from "../../utils/appendNewToName";
 import downloadPhoto from "../../utils/downloadPhoto";
 import DropDown from "../../components/DropDown";
 import { roomLabels, roomType, rooms, themeLabels, themeType, themes } from "../../utils/dropdownTypes";
 import { createAndStoreSessionId, getCurrentSessionId } from "../../utils/session";
-import { ensureSessionExists } from "../../utils/api";
+import { ensureSessionExists, mapLocalRenderImage } from "../../utils/api";
 import { getCurrentUser, isAuthenticated, logout } from "../../utils/auth";
 
 // 加载手写字体
@@ -31,6 +32,7 @@ const dancingScript = Dancing_Script({
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API_URL = `${API_BASE_URL}/api/chat-with-image`;
 const QUICK_GENERATE_USER = "quick_generate_user";
+const IMAGE_GENERATION_MODE = (process.env.NEXT_PUBLIC_IMAGE_GENERATION_MODE || "local_mock").toLowerCase();
 
 function createQuickSessionId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -54,6 +56,8 @@ export default function DreamPage() {
   const [currentUserName, setCurrentUserName] = useState<string>("");
   const [theme, setTheme] = useState<themeType>("Modern");
   const [room, setRoom] = useState<roomType>("Living Room");
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState<string>("图片预览");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 从 localStorage 恢复侧栏状态
@@ -96,7 +100,11 @@ export default function DreamPage() {
       setPhotoName(file.name);
       const url = URL.createObjectURL(file);
       setOriginalPhoto(url);
-      generatePhoto(file);
+      if (IMAGE_GENERATION_MODE === "local_mock") {
+        generatePhotoFromLocal(file);
+      } else {
+        generatePhotoFromRealRender(file);
+      }
     }
   };
 
@@ -122,7 +130,7 @@ export default function DreamPage() {
     </div>
   );
 
-  const generatePhoto = async (file: File) => {
+  const generatePhotoFromRealRender = async (file: File) => {
     await new Promise((resolve) => setTimeout(resolve, 200));
     setRestoredLoaded(false);
     setLoading(true);
@@ -156,7 +164,35 @@ export default function DreamPage() {
     } finally {
       setLoading(false);
     }
-  }
+  };
+
+  const generatePhotoFromLocal = async (file: File | null = null) => {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    setRestoredLoaded(false);
+    setLoading(true);
+    setError(null);
+    setSideBySide(Boolean(file));
+
+    try {
+      const mapped = await mapLocalRenderImage(file?.name ?? null, themeLabels[theme]);
+      if (!mapped.imageUrl) {
+        setRestoredImage(null);
+        setError(mapped.message || "未匹配到本地渲染图。");
+        return;
+      }
+      if (!file && mapped.originalImageUrl) {
+        setOriginalPhoto(mapped.originalImageUrl);
+      }
+      if (!file) {
+        setPhotoName(`${themeLabels[theme]}.png`);
+      }
+      setRestoredImage(mapped.imageUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "本地图片映射失败。");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -344,6 +380,20 @@ export default function DreamPage() {
                         <div className="mt-4">
                           <UploadDropZone />
                         </div>
+                        {IMAGE_GENERATION_MODE === "local_mock" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOriginalPhoto(null);
+                              setRestoredImage(null);
+                              setRestoredLoaded(false);
+                              generatePhotoFromLocal(null);
+                            }}
+                            className="btn-warm bg-white/80 backdrop-blur-md border border-[#8B6F47]/20 rounded-full text-[#2D2D2D] font-medium px-6 py-2 mt-4 hover:bg-white"
+                          >
+                            不上传图片，直接按风格生成
+                          </button>
+                        )}
 
                         {loading && (
                           <button
@@ -386,6 +436,17 @@ export default function DreamPage() {
                               className="btn-warm bg-[#8B6F47] backdrop-blur-md border border-[#8B6F47]/20 rounded-full text-white font-medium px-6 py-2 hover:bg-[#A68B5B]"
                             >
                               下载生成的房间图片
+                            </button>
+                          )}
+                          {restoredLoaded && restoredImage && (
+                            <button
+                              onClick={() => {
+                                setPreviewImageUrl(restoredImage);
+                                setPreviewTitle("生成图片预览");
+                              }}
+                              className="btn-warm bg-white/80 backdrop-blur-md border border-[#8B6F47]/20 rounded-full text-[#2D2D2D] font-medium px-6 py-2 hover:bg-white"
+                            >
+                              放大查看
                             </button>
                           )}
                         </div>
@@ -435,6 +496,25 @@ export default function DreamPage() {
                             />
                           )}
 
+                          {restoredImage && !originalPhoto && !sideBySide && (
+                            <button
+                              type="button"
+                              className="absolute inset-0 h-full w-full"
+                              onClick={() => {
+                                setPreviewImageUrl(restoredImage);
+                                setPreviewTitle("生成图片预览");
+                              }}
+                            >
+                              <Image
+                                alt="生成后的房间照片"
+                                src={restoredImage}
+                                className="h-full w-full object-cover"
+                                fill
+                                onLoadingComplete={() => setRestoredLoaded(true)}
+                              />
+                            </button>
+                          )}
+
                           {restoredImage && originalPhoto && !sideBySide && (
                             <div className="absolute inset-0 grid grid-cols-2 gap-2 p-2">
                               <div className="relative overflow-hidden rounded-xl bg-white/40">
@@ -464,9 +544,9 @@ export default function DreamPage() {
                           )}
                         </div>
 
-                        <div className={`${restoredLoaded ? "visible mt-4" : "invisible"}`}>
+                        <div className={`${restoredLoaded && Boolean(originalPhoto) ? "visible mt-4" : "invisible"}`}>
                           <Toggle
-                            className={`${restoredLoaded ? "visible" : "invisible"}`}
+                            className={`${restoredLoaded && Boolean(originalPhoto) ? "visible" : "invisible"}`}
                             sideBySide={sideBySide}
                             setSideBySide={(newVal) => setSideBySide(newVal)}
                           />
@@ -492,6 +572,12 @@ export default function DreamPage() {
           </button>
         </div>
       )}
+      <ImageLightbox
+        isOpen={Boolean(previewImageUrl)}
+        imageUrl={previewImageUrl}
+        title={previewTitle}
+        onClose={() => setPreviewImageUrl(null)}
+      />
     </div>
   );
 }

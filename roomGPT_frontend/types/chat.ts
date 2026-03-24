@@ -17,6 +17,13 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   imageUrl?: string;       // 如果有生成的效果图
+  references?: Array<{
+    title: string;
+    url: string;
+    snippet?: string;
+    source?: string;
+  }>;
+  followUpPrompts?: string[];
   renderJobId?: string;
   renderStatus?: 'pending' | 'completed' | 'failed';
   retryableRender?: boolean;

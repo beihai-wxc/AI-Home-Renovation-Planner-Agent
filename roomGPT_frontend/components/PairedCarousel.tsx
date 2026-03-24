@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import ImageLightbox from "./ImageLightbox";
 
 export type PairedSlide = {
   beforeSrc: string;
@@ -22,17 +23,22 @@ function SlidePanel({
   imageAlt,
   label,
   labelType,
+  onPreview,
 }: {
   title: string;
   imageSrc: string;
   imageAlt: string;
   label: string;
   labelType: "before" | "after";
+  onPreview: (url: string, alt: string) => void;
 }) {
   return (
     <div>
       <h3 className="mb-3 text-center text-xl font-semibold text-[#2D2D2D] sm:text-4xl">{title}</h3>
-      <div className="image-card group relative w-full overflow-hidden rounded-3xl border border-[#8B6F47]/20 bg-white/50 backdrop-blur-sm shadow-[0_8px_32px_rgba(139,111,71,0.08)] transition duration-500 hover:border-[#8B6F47]/40">
+      <div
+        className="image-card group relative w-full cursor-zoom-in overflow-hidden rounded-3xl border border-[#8B6F47]/20 bg-white/50 backdrop-blur-sm shadow-[0_8px_32px_rgba(139,111,71,0.08)] transition duration-500 hover:border-[#8B6F47]/40"
+        onClick={() => onPreview(imageSrc, imageAlt)}
+      >
         {/* 标签角标 */}
         <div className={`absolute top-4 left-4 z-10 px-3 py-1.5 rounded-full text-sm font-medium ${
           labelType === "before"
@@ -69,6 +75,8 @@ function SlidePanel({
 
 export default function PairedCarousel({ pairs, interval = 3500 }: PairedCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState<string>("");
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -89,6 +97,10 @@ export default function PairedCarousel({ pairs, interval = 3500 }: PairedCarouse
           imageAlt={activePair.beforeAlt}
           label="改造前"
           labelType="before"
+          onPreview={(url, alt) => {
+            setPreviewImage(url);
+            setPreviewTitle(alt);
+          }}
         />
         <SlidePanel
           title="生成后的房间"
@@ -96,6 +108,10 @@ export default function PairedCarousel({ pairs, interval = 3500 }: PairedCarouse
           imageAlt={activePair.afterAlt}
           label="改造后"
           labelType="after"
+          onPreview={(url, alt) => {
+            setPreviewImage(url);
+            setPreviewTitle(alt);
+          }}
         />
       </div>
 
@@ -118,6 +134,12 @@ export default function PairedCarousel({ pairs, interval = 3500 }: PairedCarouse
           ))}
         </div>
       </div>
+      <ImageLightbox
+        isOpen={Boolean(previewImage)}
+        imageUrl={previewImage}
+        title={previewTitle}
+        onClose={() => setPreviewImage(null)}
+      />
     </section>
   );
 }

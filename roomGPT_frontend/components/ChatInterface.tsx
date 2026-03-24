@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  fetchRecommendedPrompts,
   fetchRenderJob,
   fetchSessionMessages,
   requestRenderJob,
@@ -18,6 +19,7 @@ import { ChatMessage, AgentStatus as AgentStatusType, AGENT_DISPLAY_NAMES, AGENT
 import LoadingDots from "./LoadingDots";
 import { useToast } from "./Toast";
 import MarkdownRenderer from "./MarkdownRenderer";
+import ImageLightbox from "./ImageLightbox";
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -29,6 +31,31 @@ interface FailedDraft {
   currentRoomImage: File | null;
 }
 
+type ReferenceLink = {
+  title: string;
+  url: string;
+  snippet?: string;
+  source?: string;
+};
+
+function generateFollowUpPrompts(content: string): string[] {
+  const prompts = [
+    "请给出这套方案的预算拆分明细",
+    "请列出需要购买的主要材料和建议规格",
+    "如果我想先做低预算版，优先做哪些项目",
+    "请给一个 30 天内可执行的施工计划",
+    "有哪些容易踩坑的点需要提前规避",
+  ];
+  const normalized = content.toLowerCase();
+  if (normalized.includes("预算")) {
+    prompts.unshift("请给出高配版和性价比版两套预算");
+  }
+  if (normalized.includes("材料")) {
+    prompts.unshift("这些材料有没有更高性价比的替代品牌");
+  }
+  return Array.from(new Set(prompts)).slice(0, 3);
+}
+
 export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -38,6 +65,9 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
   const [showQuickScenes, setShowQuickScenes] = useState(false);
   const [pendingRenderJobId, setPendingRenderJobId] = useState<string | null>(null);
   const [failedDraft, setFailedDraft] = useState<FailedDraft | null>(null);
+  const [recommendedPrompts, setRecommendedPrompts] = useState<string[]>([]);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState<string>("");
   const [agentStatuses, setAgentStatuses] = useState<AgentStatusType[]>([
     { agentName: "HomeRenovationPlanner", displayName: "装修顾问", status: "idle" },
     { agentName: "InfoAgent", displayName: "咨询助手", status: "idle" },
@@ -62,6 +92,9 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     fetchSessionMessages(sessionId)
       .then(setMessages)
       .catch(() => setMessages([]));
+    fetchRecommendedPrompts(6)
+      .then(setRecommendedPrompts)
+      .catch(() => setRecommendedPrompts([]));
     setPendingRenderJobId(null);
     setFailedDraft(null);
     setAgentStatuses((prev) => prev.map((agent) => ({ ...agent, status: "idle", message: undefined })));
@@ -157,8 +190,9 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     setCurrentRoomPreview(preview);
   };
 
-  const handleSendMessage = async () => {
-    if ((!input.trim() && !currentRoomImage) || isSending) return;
+  const handleSendMessage = async (customMessage?: string) => {
+    const finalInput = (customMessage ?? input).trim();
+    if ((!finalInput && !currentRoomImage) || isSending) return;
 
     const outgoingAttachments = [
       currentRoomImage
@@ -169,7 +203,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim() || "请结合我上传的图片给出装修建议",
+      content: finalInput || "请结合我上传的图片给出装修建议",
       attachments: outgoingAttachments.length ? outgoingAttachments : undefined,
       timestamp: new Date(),
     };
@@ -204,6 +238,20 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
       );
     };
 
+    const updateReferences = (links: ReferenceLink[]) => {
+      if (!links.length) return;
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === tempMessageId
+            ? {
+                ...msg,
+                references: links,
+              }
+            : msg
+        )
+      );
+    };
+
     const updateAgentStatus = (
       agentName: string,
       status: "idle" | "processing" | "completed" | "error"
@@ -234,6 +282,9 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     };
 
     const handleComplete = () => {
+      if (accumulatedContent.trim()) {
+        updateMessage({ followUpPrompts: generateFollowUpPrompts(accumulatedContent) });
+      }
       setIsSending(false);
       setAgentStatuses((prev) =>
         prev.map((agent) =>
@@ -279,6 +330,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           },
           updateAgentStatus,
           (url) => updateMessage({ imageUrl: url }),
+          updateReferences,
           (jobId) => {
             setPendingRenderJobId(jobId);
             updateMessage({
@@ -299,6 +351,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
             updateMessage({ content: accumulatedContent });
           },
           updateAgentStatus,
+          updateReferences,
           handleComplete,
           handleError,
           sessionId
@@ -327,6 +380,21 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
             <h3 className="text-xl font-semibold text-[#2D2D2D] mb-2">开始您的装修咨询</h3>
             <p className="text-[#6B6459]">上传当前房间图，或直接描述您的装修需求。</p>
+            <div className="mx-auto mt-6 w-full max-w-[460px] rounded-2xl border border-[#8B6F47]/20 bg-white/75 p-4 text-left">
+              <div className="mb-2 text-sm font-semibold text-[#2D2D2D]">猜你想问</div>
+              <div className="flex flex-wrap gap-2">
+                {(recommendedPrompts.length ? recommendedPrompts : generateFollowUpPrompts("")).slice(0, 6).map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => handleSendMessage(prompt)}
+                    className="rounded-full border border-[#8B6F47]/20 bg-white px-3 py-1.5 text-xs text-[#5A5A5A] transition hover:bg-[#F9F4EC] hover:text-[#2D2D2D]"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -400,7 +468,36 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
                 {message.imageUrl && (
                   <div className="mt-3">
                     <div className="text-xs text-[#6B6459] mb-2">生成的效果图：</div>
-                    <img src={message.imageUrl} alt="生成的效果图" className="rounded-lg w-full max-w-md shadow-xl" />
+                    <button
+                      type="button"
+                      className="block"
+                      onClick={() => {
+                        setPreviewImageUrl(message.imageUrl || null);
+                        setPreviewTitle("生成效果图");
+                      }}
+                    >
+                      <img src={message.imageUrl} alt="生成的效果图" className="rounded-lg w-full max-w-md cursor-zoom-in shadow-xl" />
+                    </button>
+                  </div>
+                )}
+
+                {message.references && message.references.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-[#8B6F47]/15 bg-[#FBF7F0] p-3">
+                    <div className="mb-2 text-xs font-medium text-[#6B6459]">参考价格与材料链接</div>
+                    <div className="space-y-2">
+                      {message.references.map((link) => (
+                        <a
+                          key={`${message.id}-${link.url}`}
+                          href={link.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block rounded-lg border border-[#8B6F47]/10 bg-white/80 px-3 py-2 text-xs text-[#5A5A5A] hover:bg-white"
+                        >
+                          <div className="font-medium text-[#2D2D2D]">{link.title}</div>
+                          {link.snippet && <div className="mt-1 line-clamp-2">{link.snippet}</div>}
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -445,6 +542,23 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
                 {message.role === "assistant" && message.content && (
                   <ChatMessageActions content={message.content} onRegenerate={() => handleRegenerate(message)} />
                 )}
+                {message.role === "assistant" && message.followUpPrompts && message.followUpPrompts.length > 0 && (
+                  <div className="mt-3 border-t border-[#8B6F47]/15 pt-2">
+                    <div className="mb-2 text-xs font-medium text-[#6B6459]">猜你想问</div>
+                    <div className="flex flex-wrap gap-2">
+                      {message.followUpPrompts.slice(0, 3).map((prompt) => (
+                        <button
+                          key={`${message.id}-${prompt}`}
+                          type="button"
+                          onClick={() => handleSendMessage(prompt)}
+                          className="rounded-full border border-[#8B6F47]/20 bg-white px-3 py-1.5 text-xs text-[#5A5A5A] transition hover:bg-[#F9F4EC] hover:text-[#2D2D2D]"
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div
@@ -484,7 +598,9 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
             <span>刚才那条消息发送失败了，内容和图片已保留，可以直接重新发送。</span>
             <button
               type="button"
-              onClick={handleSendMessage}
+              onClick={() => {
+                void handleSendMessage();
+              }}
               disabled={isSending}
               className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-60"
             >
@@ -573,7 +689,9 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           </button>
 
           <button
-            onClick={handleSendMessage}
+            onClick={() => {
+              void handleSendMessage();
+            }}
             disabled={isSending || (!input.trim() && !currentRoomImage)}
             title="发送"
             className={`h-[56px] w-[56px] inline-flex items-center justify-center rounded-2xl transition-all duration-300 ${
@@ -589,6 +707,12 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           </button>
         </div>
       </div>
+      <ImageLightbox
+        isOpen={Boolean(previewImageUrl)}
+        imageUrl={previewImageUrl}
+        title={previewTitle}
+        onClose={() => setPreviewImageUrl(null)}
+      />
     </div>
   );
 }

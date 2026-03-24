@@ -4,6 +4,10 @@ import logging
 import os
 import re
 import uuid
+from html import unescape
+from pathlib import Path
+from urllib.parse import urlencode
+from urllib.request import urlopen
 from typing import Any, AsyncGenerator, Optional
 
 from dotenv import load_dotenv
@@ -38,6 +42,12 @@ APP_NAME = "AI_Home_Renovation"
 DEFAULT_USER = "frontend_user"
 DEFAULT_SESSION = "main_session"
 ARTIFACT_ROOT = os.path.join(os.getcwd(), ".adk", "artifacts")
+IMAGE_GENERATION_MODE = os.getenv("IMAGE_GENERATION_MODE", "local_mock").strip().lower()
+FRONTEND_PUBLIC_ROOT = Path(os.getenv("FRONTEND_PUBLIC_ROOT", Path(os.getcwd()) / "roomGPT_frontend" / "public"))
+LOCAL_ORIGINAL_DIR = Path(os.getenv("LOCAL_ORIGINAL_DIR", FRONTEND_PUBLIC_ROOT / "local-images" / "original"))
+LOCAL_RENDERED_DIR = Path(os.getenv("LOCAL_RENDERED_DIR", FRONTEND_PUBLIC_ROOT / "local-images" / "rendered"))
+GOOGLE_CSE_API_KEY = os.getenv("GOOGLE_CSE_API_KEY", "").strip()
+GOOGLE_CSE_CX = os.getenv("GOOGLE_CSE_CX", "").strip()
 
 app = FastAPI(title="AI Home Renovation Planner API")
 
@@ -117,6 +127,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     message: str
     imageUrl: Optional[str] = None
+    references: Optional[list[dict[str, str]]] = None
 
 
 class SessionResponse(BaseModel):
@@ -133,6 +144,7 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     imageUrl: Optional[str] = None
+    references: Optional[list[dict[str, str]]] = None
     created_at: str
 
 
@@ -142,6 +154,22 @@ class RenderJobResponse(BaseModel):
     imageUrl: Optional[str] = None
     message: Optional[str] = None
     retryable: bool = False
+
+
+class LocalRenderResponse(BaseModel):
+    mode: str
+    imageUrl: Optional[str] = None
+    originalImageUrl: Optional[str] = None
+    message: Optional[str] = None
+
+
+class GoogleLinksRequest(BaseModel):
+    query: str
+    max_results: int = 5
+
+
+class PromptRecommendationsResponse(BaseModel):
+    prompts: list[str]
 
 
 def require_api_key() -> None:
@@ -369,6 +397,193 @@ def normalize_assistant_output(text: str) -> str:
     return normalized
 
 
+def should_include_price_links(user_text: str, assistant_text: str) -> bool:
+    keywords = [
+        "价格",
+        "报价",
+        "预算",
+        "材料",
+        "建材",
+        "品牌",
+        "购买",
+        "哪里买",
+        "链接",
+        "参考价",
+        "单价",
+    ]
+    merged = f"{user_text}\n{assistant_text}".lower()
+    return any(keyword in merged for keyword in keywords)
+
+
+def strip_html(text: str) -> str:
+    if not text:
+        return ""
+    cleaned = re.sub(r"<[^>]+>", "", text)
+    return re.sub(r"\s+", " ", unescape(cleaned)).strip()
+
+
+def to_public_url(file_path: Path) -> str:
+    relative = file_path.relative_to(FRONTEND_PUBLIC_ROOT)
+    return "/" + str(relative).replace("\\", "/")
+
+
+def find_existing_file_by_stem(directory: Path, stem: str) -> Optional[Path]:
+    if not directory.exists():
+        return None
+    patterns = [f"{stem}.png", f"{stem}.jpg", f"{stem}.jpeg", f"{stem}.webp"]
+    for name in patterns:
+        candidate = directory / name
+        if candidate.exists():
+            return candidate
+    for candidate in directory.iterdir():
+        if candidate.is_file() and candidate.stem.lower() == stem.lower():
+            return candidate
+    return None
+
+
+def resolve_local_image_dirs() -> tuple[Path, Path]:
+    original_dir = LOCAL_ORIGINAL_DIR
+    rendered_dir = LOCAL_RENDERED_DIR
+    if original_dir.exists() and rendered_dir.exists():
+        return original_dir, rendered_dir
+
+    cwd = FRONTEND_PUBLIC_ROOT if FRONTEND_PUBLIC_ROOT.exists() else Path(os.getcwd())
+    subdirs = [p for p in cwd.iterdir() if p.is_dir()]
+
+    def find_dir(keyword: str) -> Optional[Path]:
+        for folder in subdirs:
+            if keyword in folder.name:
+                return folder
+        return None
+
+    original_fallback = find_dir("原始")
+    rendered_fallback = find_dir("渲染")
+    return original_fallback or original_dir, rendered_fallback or rendered_dir
+
+
+def resolve_local_render_mapping(
+    *,
+    original_filename: Optional[str],
+    style: Optional[str],
+) -> dict[str, Optional[str]]:
+    style = (style or "").strip()
+    original_filename = (original_filename or "").strip()
+    default_style_map = {
+        "简约风": "简约风",
+        "现代北欧风": "现代北欧风",
+        "现代风": "现代北欧风",
+    }
+
+    original_dir, rendered_dir = resolve_local_image_dirs()
+
+    if original_filename:
+        stem = Path(original_filename).stem
+        match = re.search(r"(?i)B(\d+)", stem)
+        if not match:
+            return {"image_url": None, "message": "文件名无法识别，请按 B1/B2 这类命名上传原图。"}
+        mapped_stem = f"A{match.group(1)}"
+        rendered = find_existing_file_by_stem(rendered_dir, mapped_stem)
+        original = find_existing_file_by_stem(original_dir, f"B{match.group(1)}")
+        if not rendered:
+            return {"image_url": None, "message": f"未找到与 {stem} 对应的渲染图（期望 {mapped_stem}）。"}
+        return {
+            "image_url": to_public_url(rendered),
+            "original_url": to_public_url(original) if original else None,
+            "message": None,
+        }
+
+    style_key = default_style_map.get(style)
+    if not style_key:
+        return {"image_url": None, "message": "当前无图直生仅支持简约风、现代北欧风。"}
+    rendered = find_existing_file_by_stem(rendered_dir, style_key)
+    if not rendered:
+        return {"image_url": None, "message": f"未找到风格示例图：{style_key}。"}
+    return {"image_url": to_public_url(rendered), "original_url": None, "message": None}
+
+
+async def google_cse_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
+    if not GOOGLE_CSE_API_KEY or not GOOGLE_CSE_CX:
+        return []
+
+    def _do_request() -> list[dict[str, str]]:
+        params = urlencode(
+            {
+                "key": GOOGLE_CSE_API_KEY,
+                "cx": GOOGLE_CSE_CX,
+                "q": query,
+                "num": max(1, min(max_results, 10)),
+                "lr": "lang_zh-CN",
+                "safe": "active",
+            }
+        )
+        url = f"https://www.googleapis.com/customsearch/v1?{params}"
+        with urlopen(url, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        items = payload.get("items") or []
+        results: list[dict[str, str]] = []
+        for item in items:
+            link = (item.get("link") or "").strip()
+            if not link:
+                continue
+            results.append(
+                {
+                    "title": strip_html(item.get("title") or "参考链接"),
+                    "url": link,
+                    "snippet": strip_html(item.get("snippet") or ""),
+                    "source": "Google",
+                }
+            )
+        return results
+
+    try:
+        return await asyncio.to_thread(_do_request)
+    except Exception as exc:
+        logger.warning("Google CSE search failed: %s", exc)
+        return []
+
+
+def extract_followup_prompts_from_text(text: str, limit: int = 6) -> list[str]:
+    candidates = [
+        "这套方案大概总预算是多少？请按主材和人工拆分。",
+        "如果预算减少 20%，哪些项目可以先不做？",
+        "请列出这个方案需要购买的材料清单和建议规格。",
+        "这套方案的施工顺序怎么安排最稳妥？",
+        "如果我想要更耐脏好打理，哪些材质要替换？",
+        "给我一个适合小户型的同风格替代方案。",
+    ]
+    lower_text = text.lower()
+    if "预算" in lower_text:
+        candidates.insert(0, "请给出预算下限版和上限版两套采购建议。")
+    if "材料" in lower_text:
+        candidates.insert(0, "这些材料有哪些性价比替代品牌？")
+
+    deduped: list[str] = []
+    for item in candidates:
+        if item not in deduped:
+            deduped.append(item)
+        if len(deduped) >= limit:
+            break
+    return deduped
+
+
+def build_recommended_prompts_from_sessions(sessions: list[dict[str, Any]], limit: int = 6) -> list[str]:
+    seeds: list[str] = []
+    for session in sessions[:10]:
+        for key in ("latest_user_message", "first_user_message", "title"):
+            value = (session.get(key) or "").strip()
+            if value and value != "新对话":
+                seeds.append(value)
+    merged = " ".join(seeds)
+    prompts = extract_followup_prompts_from_text(merged, limit=limit)
+    if not prompts:
+        prompts = [
+            "帮我做一个客厅的现代简约装修方案",
+            "请按 10 万预算拆分材料和人工费用",
+            "我想先改造卧室，怎么排施工顺序更合适？",
+        ]
+    return prompts[:limit]
+
+
 def build_render_completion_message(success: bool, details: str | None = None) -> str:
     if success:
         return normalize_assistant_output(
@@ -475,6 +690,7 @@ def persist_chat_records(
     user_message: str,
     assistant_message: str,
     result_filename: Optional[str] = None,
+    references: Optional[list[dict[str, str]]] = None,
 ) -> None:
     save_message(session_id=session_id, user_id=user_id, role="user", content=user_message)
     save_message(
@@ -483,6 +699,7 @@ def persist_chat_records(
         role="assistant",
         content=assistant_message,
         image_filename=result_filename,
+        references=references,
     )
 
 
@@ -566,6 +783,33 @@ async def list_session_endpoint(user_id: str = DEFAULT_USER):
     return list_sessions(user_id=user_id)
 
 
+@app.get("/api/sessions/recommended-prompts", response_model=PromptRecommendationsResponse)
+async def recommended_prompts_endpoint(user_id: str = DEFAULT_USER, limit: int = 6):
+    sessions = list_sessions(user_id=user_id)
+    prompts = build_recommended_prompts_from_sessions(sessions, limit=max(3, min(limit, 8)))
+    return PromptRecommendationsResponse(prompts=prompts)
+
+
+@app.post("/api/search/google-links")
+async def google_links_endpoint(payload: GoogleLinksRequest):
+    links = await google_cse_search(payload.query, max_results=payload.max_results)
+    return {"links": links}
+
+
+@app.post("/api/local-render-map", response_model=LocalRenderResponse)
+async def local_render_map_endpoint(
+    original_filename: str = Form(""),
+    style: str = Form(""),
+):
+    mapping = resolve_local_render_mapping(original_filename=original_filename, style=style)
+    return LocalRenderResponse(
+        mode=IMAGE_GENERATION_MODE,
+        imageUrl=mapping.get("image_url"),
+        originalImageUrl=mapping.get("original_url"),
+        message=mapping.get("message"),
+    )
+
+
 @app.post("/api/sessions/{session_id}/pin")
 async def pin_session_endpoint(
     session_id: str,
@@ -596,6 +840,7 @@ async def get_session_messages(request: Request, session_id: str, user_id: str =
             imageUrl=build_asset_url(request, session_id, message["image_filename"], user_id)
             if message["image_filename"]
             else None,
+            references=message.get("references") or [],
             created_at=message["created_at"],
         )
         for message in messages
@@ -668,18 +913,26 @@ async def chat_endpoint(request: Request, payload: ChatRequest):
         )
         reply_text = await extract_reply_text(events)
         result_filename = await get_result_image_filename(payload.user_id, payload.session_id)
+        references = []
+        if should_include_price_links(payload.message, reply_text):
+            references = await google_cse_search(
+                f"{payload.message} 装修 价格 材料 购买",
+                max_results=5,
+            )
         persist_chat_records(
             user_id=payload.user_id,
             session_id=payload.session_id,
             user_message=payload.message,
             assistant_message=reply_text,
             result_filename=result_filename,
+            references=references,
         )
         return ChatResponse(
             message=reply_text,
             imageUrl=build_asset_url(request, payload.session_id, result_filename, payload.user_id)
             if result_filename
             else None,
+            references=references,
         )
     except Exception as exc:
         logger.error("Error during chat: %s", exc)
@@ -733,6 +986,14 @@ async def chat_stream_endpoint(payload: ChatRequest):
             assistant_message = normalize_assistant_output(
                 "".join(final_reply_texts) or "".join(partial_reply_chunks)
             )
+            references: list[dict[str, str]] = []
+            if should_include_price_links(payload.message, assistant_message):
+                references = await google_cse_search(
+                    f"{payload.message} 装修 价格 材料 购买",
+                    max_results=5,
+                )
+                if references:
+                    yield f"data: {json.dumps({'type': 'references', 'links': references}, ensure_ascii=False)}\n\n"
 
             persist_chat_records(
                 user_id=payload.user_id,
@@ -740,6 +1001,7 @@ async def chat_stream_endpoint(payload: ChatRequest):
                 user_message=payload.message,
                 assistant_message=assistant_message,
                 result_filename=await get_result_image_filename(payload.user_id, payload.session_id),
+                references=references,
             )
             yield "data: [DONE]\n\n"
 
@@ -785,18 +1047,26 @@ async def chat_with_image_endpoint(
         )
         reply_text = await extract_reply_text(events)
         result_filename = await get_result_image_filename(user_id, session_id)
+        references = []
+        if should_include_price_links(message, reply_text):
+            references = await google_cse_search(
+                f"{message} 装修 价格 材料 购买",
+                max_results=5,
+            )
         persist_chat_records(
             user_id=user_id,
             session_id=session_id,
             user_message=message,
             assistant_message=reply_text,
             result_filename=result_filename,
+            references=references,
         )
         return ChatResponse(
             message=reply_text,
             imageUrl=build_asset_url(request, session_id, result_filename, user_id)
             if result_filename
             else None,
+            references=references,
         )
     except Exception as exc:
         logger.error("Error during chat-with-image: %s", exc)
@@ -861,6 +1131,14 @@ async def chat_with_image_stream_endpoint(
             assistant_message = normalize_assistant_output(
                 "".join(final_reply_texts) or "".join(partial_reply_chunks)
             )
+            references: list[dict[str, str]] = []
+            if should_include_price_links(message, assistant_message):
+                references = await google_cse_search(
+                    f"{message} 装修 价格 材料 购买",
+                    max_results=5,
+                )
+                if references:
+                    yield f"data: {json.dumps({'type': 'references', 'links': references}, ensure_ascii=False)}\n\n"
 
             persist_chat_records(
                 user_id=user_id,
@@ -868,6 +1146,7 @@ async def chat_with_image_stream_endpoint(
                 user_message=message,
                 assistant_message=assistant_message,
                 result_filename=None,
+                references=references,
             )
             if current_room_image or image:
                 job_id = await queue_render_job(
