@@ -383,7 +383,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
             <div className="mx-auto mt-6 w-full max-w-[460px] rounded-2xl border border-[#8B6F47]/20 bg-white/75 p-4 text-left">
               <div className="mb-2 text-sm font-semibold text-[#2D2D2D]">猜你想问</div>
               <div className="flex flex-wrap gap-2">
-                {(recommendedPrompts.length ? recommendedPrompts : generateFollowUpPrompts("")).slice(0, 6).map((prompt) => (
+                {(recommendedPrompts.length ? recommendedPrompts : generateFollowUpPrompts("")).slice(0, 3).map((prompt) => (
                   <button
                     key={prompt}
                     type="button"

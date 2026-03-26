@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { deleteSession, fetchSessions, pinSession } from "../utils/api";
 import { SessionSummary } from "../types/chat";
-import { getCurrentUser, logout } from "../utils/auth";
-import { useRouter } from "next/navigation";
 
 interface ChatHistoryPanelProps {
   isOpen: boolean;
@@ -20,9 +18,7 @@ export default function ChatHistoryPanel({
   onSelectSession,
   onNewChat,
 }: ChatHistoryPanelProps) {
-  const router = useRouter();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [currentUserName, setCurrentUserName] = useState("用户");
   const [activeMenuSessionId, setActiveMenuSessionId] = useState<string | null>(null);
   const [pendingDeleteSession, setPendingDeleteSession] = useState<SessionSummary | null>(null);
   const [actionError, setActionError] = useState("");
@@ -30,10 +26,6 @@ export default function ChatHistoryPanel({
   useEffect(() => {
     fetchSessions().then(setSessions).catch(() => setSessions([]));
   }, [currentSessionId]);
-
-  useEffect(() => {
-    setCurrentUserName(getCurrentUser()?.name || "用户");
-  }, []);
 
   useEffect(() => {
     if (!actionError) return;
@@ -76,11 +68,6 @@ export default function ChatHistoryPanel({
       return "";
     }
     return summary;
-  };
-
-  const handleLogout = () => {
-    logout();
-    router.replace("/auth?redirect=/dream");
   };
 
   const reloadSessions = async () => {
@@ -222,16 +209,6 @@ export default function ChatHistoryPanel({
             </motion.div>
           ))
         )}
-      </div>
-      <div className="border-t border-[#8B6F47]/15 p-3">
-        <div className="text-xs text-[#6B6459]">当前用户：{currentUserName}</div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="mt-1 text-xs font-medium text-[#8B6F47] hover:underline"
-        >
-          退出登录
-        </button>
       </div>
 
       {pendingDeleteSession && (

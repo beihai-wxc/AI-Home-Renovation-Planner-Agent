@@ -57,7 +57,7 @@ const pairedSlides: PairedSlide[] = [
 
 const introCards = [
   {
-    title: "为什么做这个",
+    title: "你为什么需要Lumière",
     content:
       "装修前最难的是提前看见结果，也很难把模糊想法讲清楚。这个项目希望把灵感更早变成可以讨论的可视化方案。",
     icon: (
@@ -117,6 +117,7 @@ const agentShowcase = [
 export default function HomePage() {
   const [showIntro, setShowIntro] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showScrollHint, setShowScrollHint] = useState(true);
 
   useEffect(() => {
     const sync = () => setIsLoggedIn(Boolean(getCurrentUser()));
@@ -125,8 +126,17 @@ export default function HomePage() {
     return () => window.removeEventListener("storage", sync);
   }, []);
 
+  useEffect(() => {
+    const handleScrollHint = () => {
+      setShowScrollHint(window.scrollY <= 2);
+    };
+    handleScrollHint();
+    window.addEventListener("scroll", handleScrollHint, { passive: true });
+    return () => window.removeEventListener("scroll", handleScrollHint);
+  }, []);
+
   return (
-    <div className="home-cinematic relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
+    <div className="home-cinematic relative min-h-screen flex flex-col items-center overflow-x-hidden">
       {/* 温暖动态背景层 */}
       <div className="dream-background fixed inset-0 -z-10 pointer-events-none">
         {/* 主背景由 CSS 渐变控制 */}
@@ -141,48 +151,91 @@ export default function HomePage() {
       <Header />
       {/* 固定导航占位 */}
       <div className="header-spacer" />
-      <main className="relative mt-10 flex w-full flex-1 flex-col items-center justify-center px-6 text-center sm:mt-12">
-        <motion.h1
-          initial={{ opacity: 0, y: 28 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.75 }}
-          className="mx-auto max-w-6xl font-display text-4xl font-bold tracking-tight text-[#2D2D2D] sm:text-7xl"
-        >
-          把你的家变成{" "}
-          <span className="relative whitespace-nowrap text-[#8B6F47]">
-            <SquigglyLines />
-            <span className="relative">理想的样子</span>
-          </span>
-        </motion.h1>
-
-        <motion.h2
-          initial={{ opacity: 0, y: 22 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.08 }}
-          className="mx-auto mt-7 max-w-4xl text-base leading-8 text-[#5A5A5A] sm:mt-10 sm:text-2xl"
-        >
-          上传房间照片，预览改造效果。<br className="hidden sm:block" />
-          先看效果，再做决定，让装修方案更有把握。
-        </motion.h2>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.16 }}
-        >
-          <Link
-            className="btn-warm mt-8 inline-flex rounded-2xl bg-[#8B6F47] px-8 py-4 text-lg font-semibold text-white transition-all duration-300 hover:bg-[#A68B5B]"
-            href={isLoggedIn ? "/dream" : "/auth?redirect=/dream"}
+      <main className="relative w-full flex-1 px-6 text-center">
+        <section className="relative mx-auto flex min-h-[calc(100vh-72px)] w-full max-w-7xl flex-col items-center justify-center pt-6 sm:pt-10">
+          <motion.h1
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75 }}
+            className="mx-auto max-w-6xl font-display text-4xl font-bold tracking-tight text-[#2D2D2D] sm:text-7xl"
           >
-            开始设计你的空间
-          </Link>
-        </motion.div>
+            把你的家变成{" "}
+            <span className="relative whitespace-nowrap text-[#8B6F47]">
+              <SquigglyLines />
+              <span className="relative">理想的样子</span>
+            </span>
+          </motion.h1>
+
+          <motion.h2
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.08 }}
+            className="mx-auto mt-7 max-w-4xl text-base leading-8 text-[#5A5A5A] sm:mt-10 sm:text-2xl"
+          >
+            上传房间照片，预览改造效果。<br className="hidden sm:block" />
+            先看效果，再做决定，让装修方案更有把握。
+          </motion.h2>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.16 }}
+          >
+            <Link
+              className="btn-warm mt-8 inline-flex rounded-2xl bg-[#8B6F47] px-8 py-4 text-lg font-semibold text-white transition-all duration-300 hover:bg-[#A68B5B]"
+              href={isLoggedIn ? "/dream" : "/auth?redirect=/dream"}
+            >
+              开始设计你的空间
+            </Link>
+          </motion.div>
+
+          {showScrollHint && (
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+              onClick={() => {
+                const target = document.getElementById("agent-workflow");
+                if (!target) {
+                  return;
+                }
+                const headerOffset = 88;
+                const targetTop = target.getBoundingClientRect().top + window.scrollY - headerOffset;
+                window.scrollTo({
+                  top: Math.max(0, targetTop),
+                  behavior: "smooth",
+                });
+              }}
+              className="absolute bottom-5 right-2 hidden select-none flex-col items-center rounded-full border border-[#8B6F47]/20 bg-white/65 px-2 py-3 text-[#8B6F47]/85 shadow-[0_8px_24px_rgba(139,111,71,0.16)] backdrop-blur-md transition-all hover:border-[#8B6F47]/35 hover:bg-white/80 sm:flex"
+              aria-label="下拉了解我们"
+            >
+              <span
+                className="text-[11px] font-medium tracking-[0.08em]"
+                style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+              >
+                下拉了解我们
+              </span>
+              <motion.svg
+                className="mt-2 h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                animate={{ y: [0, 4, 0] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+              </motion.svg>
+            </motion.button>
+          )}
+        </section>
 
         <motion.section
+          id="agent-workflow"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.75, delay: 0.22 }}
-          className="mt-8 w-full max-w-6xl"
+          className="mx-auto mt-8 w-full max-w-6xl"
         >
           <div className="rounded-[28px] border border-[#8B6F47]/12 bg-white/70 px-5 py-5 shadow-[0_18px_60px_rgba(139,111,71,0.08)] backdrop-blur-md sm:px-7 sm:py-6">
             <div className="grid gap-5 text-left lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)] lg:items-start lg:gap-8">
@@ -240,12 +293,12 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 26 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.75, delay: 0.24 }}
-          className="mt-10 w-full sm:mt-14"
+          className="mx-auto mt-10 w-full max-w-7xl sm:mt-14"
         >
           <PairedCarousel pairs={pairedSlides} interval={4000} />
         </motion.section>
 
-        <section id="about" className="mt-12 w-full pb-10 sm:mt-16 sm:pb-16 px-6">
+        <section id="about" className="mx-auto mt-12 w-full max-w-7xl px-6 pb-10 sm:mt-16 sm:pb-16">
           <div className="mx-auto max-w-6xl text-left">
             <motion.h3
               initial={{ opacity: 0, y: 18 }}

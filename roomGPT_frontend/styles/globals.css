@@ -85,7 +85,11 @@
 
 /* 卡片图标悬浮效果 */
 .intro-zoom-card:hover .card-icon {
-  transform: scale(1.1) rotate(-5deg);
+  transform: scale(1.12);
+}
+
+.intro-zoom-card .card-icon {
+  transform-origin: left center;
 }
 
 /* ========== Dream 页面背景 - 温暖优雅 ========== */

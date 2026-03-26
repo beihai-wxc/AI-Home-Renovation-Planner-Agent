@@ -48,6 +48,7 @@ LOCAL_ORIGINAL_DIR = Path(os.getenv("LOCAL_ORIGINAL_DIR", FRONTEND_PUBLIC_ROOT /
 LOCAL_RENDERED_DIR = Path(os.getenv("LOCAL_RENDERED_DIR", FRONTEND_PUBLIC_ROOT / "local-images" / "rendered"))
 GOOGLE_CSE_API_KEY = os.getenv("GOOGLE_CSE_API_KEY", "").strip()
 GOOGLE_CSE_CX = os.getenv("GOOGLE_CSE_CX", "").strip()
+QUICK_GENERATE_USER = "quick_generate_user"
 
 app = FastAPI(title="AI Home Renovation Planner API")
 
@@ -526,6 +527,19 @@ def resolve_local_render_mapping(
     if not rendered:
         return {"image_url": None, "message": f"未找到风格示例图：{style_key}。"}
     return {"image_filename": rendered.name, "original_filename": None, "message": None}
+
+
+def extract_style_from_message(message: str) -> str:
+    text = (message or "").strip()
+    if not text:
+        return ""
+    if "现代北欧风" in text:
+        return "现代北欧风"
+    if "简约风" in text:
+        return "简约风"
+    if "现代风" in text:
+        return "现代风"
+    return ""
 
 
 async def google_cse_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
@@ -1128,6 +1142,34 @@ async def chat_with_image_endpoint(
     user_id: str = Form(DEFAULT_USER),
     session_id: str = Form(DEFAULT_SESSION),
 ):
+    if IMAGE_GENERATION_MODE == "local_mock" and user_id == QUICK_GENERATE_USER:
+        ensure_session(session_id=session_id, user_id=user_id, title=message[:80] or "快速生成")
+        uploaded_image = current_room_image or image
+        mapping = resolve_local_render_mapping(
+            original_filename=getattr(uploaded_image, "filename", "") if uploaded_image else "",
+            style=extract_style_from_message(message),
+        )
+        image_filename = mapping.get("image_filename")
+        image_url = (
+            str(request.url_for("local_file_asset", kind="rendered", filename=quote(image_filename)))
+            if image_filename
+            else None
+        )
+        response_message = mapping.get("message") or "已从本地渲染库返回效果图（未调用实时生成模型）。"
+        persist_chat_records(
+            user_id=user_id,
+            session_id=session_id,
+            user_message=message,
+            assistant_message=response_message,
+            result_filename=None,
+            references=[],
+        )
+        return ChatResponse(
+            message=response_message,
+            imageUrl=image_url,
+            references=[],
+        )
+
     require_api_key()
     ensure_session(session_id=session_id, user_id=user_id, title=message[:80] or "新对话")
     await ensure_adk_session(user_id=user_id, session_id=session_id)
