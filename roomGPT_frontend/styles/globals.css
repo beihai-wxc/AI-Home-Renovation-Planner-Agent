@@ -148,7 +148,7 @@
     max-width: 70%;
     padding: 16px 22px;
     border-radius: 24px 24px 8px 24px;
-    background: linear-gradient(135deg, var(--color-accent) 0%, #3d2f26 100%);
+    background: linear-gradient(135deg, #4e3c30 0%, #3d2f26 100%);
     color: #fcf9f8;
     box-shadow: 0 4px 12px rgba(78, 60, 48, 0.15), 0 8px 24px rgba(78, 60, 48, 0.1);
     font-family: "Outfit", "Noto Sans SC", sans-serif;
@@ -157,12 +157,12 @@
 
   .message-assistant {
     max-width: 85%;
-    padding: 16px 22px;
-    border-radius: 24px 24px 24px 8px;
-    background: linear-gradient(135deg, #ffffff 0%, var(--surface-2) 100%);
+    padding: 18px 24px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #ffffff 0%, #f7f3f0 100%);
     color: var(--text-primary);
     border: 1px solid var(--border-default);
-    box-shadow: 0 2px 8px rgba(78, 60, 48, 0.08);
+    box-shadow: 0 2px 12px rgba(78, 60, 48, 0.08), 0 6px 20px rgba(78, 60, 48, 0.05);
     font-family: "Outfit", "Noto Sans SC", sans-serif;
   }
 

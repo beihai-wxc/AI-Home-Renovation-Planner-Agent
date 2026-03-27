@@ -670,7 +670,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder="输入您的问题或描述装修需求..."
-          className="w-full min-h-[48px] leading-5 bg-white/80 backdrop-blur-md text-text-primary rounded-2xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#8B6F47]/20 focus:bg-white transition placeholder:text-text-secondary border border-[#bdb3a5]/30 shadow-sm"
+          className="w-full min-h-[52px] leading-5 bg-white/80 backdrop-blur-md text-text-primary rounded-2xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#bdb3a5]/20 focus:bg-white transition-all duration-300 placeholder:text-[#9f8370]/60 border border-[#bdb3a5]/20 shadow-sm active:scale-[0.99]"
           rows={1}
           disabled={isSending}
         />
@@ -693,7 +693,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           className={`h-[56px] w-[56px] inline-flex items-center justify-center rounded-2xl transition-all duration-300 shadow-sm ${
             isSending
               ? "bg-white/60 text-text-secondary cursor-not-allowed"
-              : "bg-white text-accent hover:bg-[#fcf9f8] hover:shadow-md"
+              : "bg-white text-accent hover:bg-[#fcf9f8] hover:shadow-md hover:-translate-y-0.5 active:scale-95"
           }`}
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -710,7 +710,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           className={`h-[56px] w-[56px] inline-flex items-center justify-center rounded-2xl transition-all duration-300 shadow-sm ${
             isSending || (!input.trim() && !currentRoomImage)
               ? "bg-white/60 text-text-secondary cursor-not-allowed"
-              : "bg-[#8B6F47] text-white hover:bg-[#A68B5B] hover:shadow-md"
+              : "bg-[#8B6F47] text-white hover:bg-[#A68B5B] hover:shadow-md hover:-translate-y-0.5 active:scale-95"
           }`}
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

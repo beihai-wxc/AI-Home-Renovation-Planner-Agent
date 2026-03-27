@@ -118,9 +118,9 @@ export default function ChatHistoryPanel({
         <h2 className="text-base font-semibold text-[#4e3c30] mb-3 font-display">历史记录</h2>
         <button
           onClick={() => onNewChat?.()}
-          className="w-full !bg-[#4e3c30] !text-white px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide hover:bg-[#3d2f26] transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 active:scale-95"
+          className="w-full flex items-center justify-center gap-2 bg-[#4e3c30] text-white px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide hover:bg-[#3d2f26] transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 active:scale-95"
         >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           新对话

@@ -92,7 +92,7 @@ export default function DreamPage() {
 
   const UploadDropZone = () => (
     <div
-      className="mt-4 relative w-full max-w-[670px] overflow-hidden rounded-2xl border-2 border-dashed border-[#8B6F47]/30 bg-white/60 backdrop-blur-sm transition-all duration-300 cursor-pointer group hover:border-[#8B6F47]/50 hover:bg-white/80"
+      className="mt-4 relative w-full max-w-[670px] overflow-hidden rounded-2xl border-2 border-dashed border-[#bdb3a5]/30 bg-gradient-to-br from-white to-[#fcf9f8] transition-all duration-300 cursor-pointer group hover:border-[#8B6F47]/50 hover:shadow-lg"
       onClick={() => fileInputRef.current?.click()}
     >
       <input
@@ -110,17 +110,20 @@ export default function DreamPage() {
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
-          <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-sm font-medium text-[#2D2D2D] shadow-sm">
+          <div className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1.5 text-xs font-medium text-[#4e3c30] shadow-md backdrop-blur-sm">
             重新上传
           </div>
         </div>
       ) : (
         <div className="flex h-[250px] flex-col items-center justify-center p-12">
-          <svg className="mb-4 h-12 w-12 text-[#8B6F47]/60 transition-all duration-300 group-hover:scale-110 group-hover:text-[#8B6F47]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-          </svg>
-          <p className="text-xl font-medium text-[#2D2D2D]">点击上传您的房间照片</p>
-          <p className="mt-2 text-[#8A8A8A]">支持 JPG, PNG 格式</p>
+          <div className="relative mb-4">
+            <div className="absolute inset-0 bg-[#8B6F47]/10 rounded-full blur-xl animate-pulse" />
+            <svg className="relative h-14 w-14 text-[#8B6F47]/70 transition-all duration-300 group-hover:scale-110 group-hover:text-[#8B6F47]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4v16m8-8H4" />
+            </svg>
+          </div>
+          <p className="text-base font-semibold text-[#4e3c30]">点击上传您的房间照片</p>
+          <p className="mt-2 text-xs text-[#9f8370]/80">支持 JPG、PNG 格式，最大 10MB</p>
         </div>
       )}
     </div>
@@ -159,22 +162,35 @@ export default function DreamPage() {
       <header className="relative z-50 bg-[#4e3c30] border-b border-[#4e3c30]">
         <div className="flex items-center justify-between w-full py-3 px-4 sm:px-6">
           {/* 左侧：设计你的理想空间 */}
-          <h1 className="font-display text-lg font-bold tracking-normal text-white sm:text-xl">
-            设计你的{" "}
-            <span
-              className={`${dancingScript.className} text-lg sm:text-xl font-semibold italic text-[#E8B86D]`}
-            >
-              理想空间
-            </span>
-          </h1>
+          <div>
+            <p className="text-[10px] font-semibold tracking-widest text-white/60 mb-0.5">DESIGN YOUR SPACE</p>
+            <h1 className="font-display text-lg font-bold tracking-normal text-white sm:text-xl">
+              设计你的{" "}
+              <span
+                className={`${dancingScript.className} text-lg sm:text-xl font-semibold italic text-[#E8B86D]`}
+              >
+                理想空间
+              </span>
+            </h1>
+          </div>
 
           {/* 中间：模式切换按钮 */}
-          <div className="bg-[#3d2f26]/80 p-1.5 rounded-xl shadow-inner">
+          <div className="relative flex gap-2 bg-[#3d2f26]/80 p-1.5 rounded-xl shadow-inner">
+            {/* 滑块背景 */}
+            <motion.div
+              initial={false}
+              animate={{
+                left: mode === "generate" ? "6px" : "calc(50% + 6px)",
+                width: "calc(50% - 12px)"
+              }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="absolute top-1.5 h-[calc(100%-12px)] bg-white rounded-lg shadow-lg"
+            />
             <button
               onClick={() => setMode("generate")}
-              className={`px-5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-300 ${
+              className={`relative z-10 px-5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-300 ${
                 mode === "generate"
-                  ? "bg-white text-[#4e3c30] shadow-md"
+                  ? "text-[#4e3c30]"
                   : "text-[#9f8370] hover:text-white"
               }`}
             >
@@ -182,9 +198,9 @@ export default function DreamPage() {
             </button>
             <button
               onClick={() => setMode("chat")}
-              className={`px-5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-300 ${
+              className={`relative z-10 px-5 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-300 ${
                 mode === "chat"
-                  ? "bg-white text-[#4e3c30] shadow-md"
+                  ? "text-[#4e3c30]"
                   : "text-[#9f8370] hover:text-white"
               }`}
             >
@@ -297,10 +313,42 @@ export default function DreamPage() {
                   // 快速生成模式
                   <motion.div className="w-full h-full overflow-y-auto px-4 pt-8 pb-6 sm:px-6">
                     <div className="mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-[minmax(360px,520px)_1fr] lg:items-start">
-                      <div className="rounded-xl border border-[#bdb3a5]/25 bg-[#fcf9f8] p-6 shadow-[0_4px_20px_-2px_rgba(189,179,165,0.12),0_6px_30px_-4px_rgba(189,179,165,0.08)] transition-all duration-300 hover:shadow-[0_8px_30px_-4px_rgba(189,179,165,0.15),0_12px_40px_-6px_rgba(189,179,165,0.1)] hover:-translate-y-1">
+                      <div className="rounded-xl border border-[#bdb3a5]/25 bg-[#fcf9f8] p-6 shadow-[0_2px_8px_rgba(189,179,165,0.08)] transition-all duration-300 hover:shadow-[0_4px_16px_rgba(189,179,165,0.12)] hover:-translate-y-0.5">
+                        {/* 流式步骤指示器 */}
+                        <div className="mb-6 flex items-center gap-2">
+                          <div className={`flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-semibold transition-all border-2 ${
+                            theme ? "bg-white border-[#8B6F47] text-[#8B6F47]" : "bg-[#f2ebe7] border-[#bdb3a5]/30 text-[#9f8370]"
+                          }`}>
+                            1
+                          </div>
+                          <div className="relative flex-1">
+                            <div className={`h-0.5 transition-all ${theme ? "bg-[#8B6F47]" : "bg-[#f2ebe7]"}`} />
+                            {/* 箭头 */}
+                            {theme && <div className="absolute right-2 top-1/2 -translate-y-1/2 w-0 h-0 border-l-[5px] border-t-[2.5px] border-b-[2.5px] border-transparent border-t-[#8B6F47] border-b-[#8B6F47]" />}
+                          </div>
+                          <div className={`flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-semibold transition-all border-2 ${
+                            room ? "bg-white border-[#8B6F47] text-[#8B6F47]" : "bg-[#f2ebe7] border-[#bdb3a5]/30 text-[#9f8370]"
+                          }`}>
+                            2
+                          </div>
+                          <div className="relative flex-1">
+                            <div className={`h-0.5 transition-all ${room ? "bg-[#8B6F47]" : "bg-[#f2ebe7]"}`} />
+                            {/* 箭头 */}
+                            {room && <div className="absolute right-2 top-1/2 -translate-y-1/2 w-0 h-0 border-l-[5px] border-t-[2.5px] border-b-[2.5px] border-transparent border-t-[#8B6F47] border-b-[#8B6F47]" />}
+                          </div>
+                          <div className={`flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-semibold transition-all border-2 ${
+                            originalPhoto ? "bg-white border-[#8B6F47] text-[#8B6F47]" : "bg-[#f2ebe7] border-[#bdb3a5]/30 text-[#9f8370]"
+                          }`}>
+                            3
+                          </div>
+                        </div>
+
                         <div className="space-y-4">
                           <div className="flex mt-1 items-center space-x-3">
-                            <Image src="/number-1-accent.svg" width={28} height={28} alt="步骤一" />
+                            <div className={`relative transition-all ${theme ? "opacity-100 scale-105" : "opacity-60"}`}>
+                              <Image src="/number-1-accent.svg" width={28} height={28} alt="步骤一" />
+                              {theme && <div className="absolute -inset-1 rounded-lg bg-[#8B6F47]/10" />}
+                            </div>
                             <div>
                               <p className="text-left font-medium text-[#4e3c30]">选择您的装修风格</p>
                               <p className="text-[10px] font-normal tracking-wider text-[#9f8370]/60 mt-0.5 uppercase">Style Selection</p>
@@ -315,7 +363,10 @@ export default function DreamPage() {
 
                         <div className="space-y-4 mt-6">
                           <div className="flex items-center space-x-3">
-                            <Image src="/number-2-accent.svg" width={28} height={28} alt="步骤二" />
+                            <div className={`relative transition-all ${room ? "opacity-100 scale-105" : "opacity-60"}`}>
+                              <Image src="/number-2-accent.svg" width={28} height={28} alt="步骤二" />
+                              {room && <div className="absolute -inset-1 rounded-lg bg-[#8B6F47]/10" />}
+                            </div>
                             <div>
                               <p className="text-left font-medium text-[#4e3c30]">选择您的房间类型</p>
                               <p className="text-[10px] font-normal tracking-wider text-[#9f8370]/60 mt-0.5 uppercase">Room Type</p>
@@ -330,7 +381,10 @@ export default function DreamPage() {
 
                         <div className="mt-6">
                           <div className="flex items-center space-x-3">
-                            <Image src="/number-3-accent.svg" width={28} height={28} alt="步骤三" />
+                            <div className={`relative transition-all ${originalPhoto ? "opacity-100 scale-105" : "opacity-60"}`}>
+                              <Image src="/number-3-accent.svg" width={28} height={28} alt="步骤三" />
+                              {originalPhoto && <div className="absolute -inset-1 rounded-lg bg-[#8B6F47]/10" />}
+                            </div>
                             <div>
                               <p className="text-left font-medium text-[#4e3c30]">上传一张您的房间照片</p>
                               <p className="text-[10px] font-normal tracking-wider text-[#9f8370]/60 mt-0.5 uppercase">Upload Photo</p>
@@ -350,7 +404,7 @@ export default function DreamPage() {
                         )}
                       </div>
 
-                      <div className="rounded-3xl border border-[#bdb3a5]/25 bg-[#fcf9f8] p-5 min-h-[620px] shadow-[0_8px_30px_-4px_rgba(189,179,165,0.15),0_12px_40px_-6px_rgba(189,179,165,0.1)] transition-all duration-300 hover:shadow-[0_12px_40px_-4px_rgba(189,179,165,0.18),0_18px_50px_-8px_rgba(189,179,165,0.12)] hover:-translate-y-1">
+                      <div className="rounded-3xl border border-[#bdb3a5]/25 bg-[#fcf9f8] p-5 min-h-[620px] shadow-[0_8px_24px_rgba(189,179,165,0.12)] transition-all duration-300 hover:shadow-[0_12px_32px_rgba(189,179,165,0.15)] hover:-translate-y-1">
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <div>
                             <h2 className="text-base font-semibold text-[#4e3c30]">生成结果</h2>
@@ -381,8 +435,17 @@ export default function DreamPage() {
 
                         <div className="relative w-full aspect-[4/3] rounded-2xl border border-[#bdb3a5]/25 bg-white/80 overflow-hidden">
                           {!restoredImage && !loading && (
-                            <div className="absolute inset-0 flex items-center justify-center text-sm text-[#8A8A8A]">
-                              右侧将显示新生成的图片
+                            <div className="absolute inset-0 flex flex-col items-center justify-center p-8">
+                              {/* 装饰性图标 */}
+                              <div className="relative mb-6">
+                                <div className="absolute inset-0 bg-[#8B6F47]/10 rounded-full blur-xl" />
+                                <svg className="relative w-16 h-16 text-[#8B6F47]/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1}>
+                                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                                  <path d="M3 9h18M9 21V9M15 9v6M9 3v2M15 3v2" />
+                                </svg>
+                              </div>
+                              <p className="text-sm font-medium text-[#4e3c30]">生成结果将显示在这里</p>
+                              <p className="text-xs text-[#9f8370]/70 mt-2">完成上方步骤后开始生成</p>
                             </div>
                           )}
 
