@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Source+Han+Sans+SC:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -41,7 +41,7 @@
 
   html,
   body {
-    font-family: "Outfit", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+    font-family: "Outfit", "Source Han Sans SC", system-ui, -apple-system, sans-serif;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -49,11 +49,11 @@
 
   /* 字体层级 */
   .font-display {
-    font-family: "Playfair Display", "Noto Sans SC", serif;
+    font-family: "Playfair Display", "Noto Serif SC", serif;
   }
 
   .font-body {
-    font-family: "Outfit", "Noto Sans SC", system-ui, sans-serif;
+    font-family: "Outfit", "Source Han Sans SC", system-ui, sans-serif;
   }
 }
 
