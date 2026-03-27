@@ -11,7 +11,6 @@ import ChatInterface from "../../components/ChatInterface";
 import ChatHistoryPanel from "../../components/ChatHistoryPanel";
 import Skeleton from "../../components/Skeleton";
 import ImageLightbox from "../../components/ImageLightbox";
-import appendNewToName from "../../utils/appendNewToName";
 import downloadPhoto from "../../utils/downloadPhoto";
 import DropDown from "../../components/DropDown";
 import { roomLabels, roomType, rooms, themeLabels, themeType, themes } from "../../utils/dropdownTypes";
@@ -27,6 +26,16 @@ const dancingScript = Dancing_Script({
   variable: "--font-dancing",
 });
 
+function sanitizeDownloadPart(value: string) {
+  return value.replace(/[\\/:*?"<>|]/g, "-").trim();
+}
+
+function resolveImageExtension(url: string | null, fallbackName?: string | null) {
+  const source = url || fallbackName || "";
+  const match = source.match(/\.([a-zA-Z0-9]+)(?:[?#].*)?$/);
+  return match ? `.${match[1].toLowerCase()}` : ".png";
+}
+
 export default function DreamPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"generate" | "chat">("generate");
@@ -36,7 +45,7 @@ export default function DreamPage() {
   const [restoredImage, setRestoredImage] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [restoredLoaded, setRestoredLoaded] = useState<boolean>(false);
-  const [loadingStage, setLoadingStage] = useState<string>("正在生成图片...");
+  const [loadingStage, setLoadingStage] = useState<string>("正在分析图片内容...");
   const [error, setError] = useState<string | null>(null);
   const [photoName, setPhotoName] = useState<string | null>(null);
   const [theme, setTheme] = useState<themeType>("Modern");
@@ -70,8 +79,9 @@ export default function DreamPage() {
     if (!loading) return;
 
     const stages = [
-      "正在生成图片...",
-      "正在准备预览结果...",
+      "正在分析图片内容...",
+      "正在生成效果图...",
+      "正在准备展示结果...",
     ];
     let index = 0;
     setLoadingStage(stages[0]);
@@ -95,7 +105,7 @@ export default function DreamPage() {
     setRestoredImage(null);
     setRestoredLoaded(false);
     setLoading(true);
-    setLoadingStage("正在生成图片...");
+    setLoadingStage("正在分析图片内容...");
     setError(null);
     setPreviewImageUrl(null);
   };
@@ -377,7 +387,8 @@ export default function DreamPage() {
                           {restoredLoaded && restoredImage && (
                             <button
                               onClick={() => {
-                                downloadPhoto(restoredImage, appendNewToName(photoName || "generated-room.png"));
+                                const filename = `${sanitizeDownloadPart(themeLabels[theme])}-${sanitizeDownloadPart(roomLabels[room])}-new${resolveImageExtension(restoredImage, photoName)}`;
+                                downloadPhoto(restoredImage, filename);
                               }}
                               className="btn-warm rounded-full border border-[#8B6F47]/20 bg-[#8B6F47] px-5 py-2 font-medium text-white backdrop-blur-md hover:bg-[#A68B5B]"
                             >
@@ -421,7 +432,7 @@ export default function DreamPage() {
                                       </svg>
                                     </motion.div>
                                     <div className="text-base font-semibold text-[#2D2D2D]">
-                                      本地图片加载中
+                                      图片生成中
                                     </div>
                                     <motion.div
                                       key={loadingStage}

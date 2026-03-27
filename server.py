@@ -169,6 +169,11 @@ class GoogleLinksRequest(BaseModel):
     max_results: int = 5
 
 
+class VisionShoppingResponse(BaseModel):
+    message: str
+    references: Optional[list[dict[str, str]]] = None
+
+
 class PromptRecommendationsResponse(BaseModel):
     prompts: list[str]
 
@@ -689,6 +694,157 @@ def build_render_completion_message(success: bool, details: str | None = None) -
     )
 
 
+def extract_search_keywords(text: str) -> str:
+    match = re.search(r"搜索关键词[:：]\s*(.+)", text)
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
+def strip_section_prefix(text: str) -> str:
+    return re.sub(r"^[A-Za-z\u4e00-\u9fff\s/【】]+[:：]\s*", "", text).strip()
+
+
+def build_platform_search_links(query: str) -> list[dict[str, str]]:
+    safe_query = (query or "家具 同款").strip()
+    encoded_query = quote(safe_query)
+    return [
+        {
+            "title": f"淘宝搜索：{safe_query}",
+            "url": f"https://s.taobao.com/search?q={encoded_query}",
+            "snippet": "打开淘宝搜索页查看同款或相似款商品。",
+            "source": "Taobao",
+        },
+        {
+            "title": f"京东搜索：{safe_query}",
+            "url": f"https://search.jd.com/Search?keyword={encoded_query}",
+            "snippet": "打开京东搜索页查看同款或相似款商品。",
+            "source": "JD",
+        },
+        {
+            "title": f"1688搜索：{safe_query}",
+            "url": f"https://s.1688.com/selloffer/offer_search.htm?keywords={encoded_query}",
+            "snippet": "打开 1688 搜索页查看源头货盘或相似款。",
+            "source": "1688",
+        },
+        {
+            "title": f"拼多多搜索：{safe_query}",
+            "url": f"https://mobile.yangkeduo.com/search_result.html?search_key={encoded_query}",
+            "snippet": "打开拼多多搜索页查看同款或平替商品。",
+            "source": "Pinduoduo",
+        },
+    ]
+
+
+def dedupe_links(links: list[dict[str, str]], limit: int = 8) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
+    for link in links:
+        url = (link.get("url") or "").strip()
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        results.append(link)
+        if len(results) >= limit:
+            break
+    return results
+
+
+async def search_furniture_purchase_links(query: str) -> list[dict[str, str]]:
+    normalized_query = (query or "家具 同款").strip()
+    all_links: list[dict[str, str]] = []
+
+    if not GOOGLE_CSE_API_KEY or not GOOGLE_CSE_CX:
+        logger.info("Google CSE not configured for furniture search, using platform fallback links.")
+        return build_platform_search_links(normalized_query)
+
+    search_queries = [
+        f"{normalized_query} 家具 同款 购买",
+        f"{normalized_query} site:taobao.com",
+        f"{normalized_query} site:jd.com",
+        f"{normalized_query} site:1688.com",
+        f"{normalized_query} site:pinduoduo.com",
+    ]
+
+    for search_query in search_queries:
+        links = await google_cse_search(search_query, max_results=4)
+        if links:
+            logger.info("Furniture link search succeeded for query: %s", search_query)
+        else:
+            logger.info("Furniture link search returned empty for query: %s", search_query)
+        all_links.extend(links)
+
+    deduped = dedupe_links(all_links, limit=6)
+    if deduped:
+        return deduped
+
+    logger.info("Falling back to platform search links for furniture query: %s", normalized_query)
+    return build_platform_search_links(normalized_query)
+
+
+async def analyze_furniture_image_with_links(
+    *,
+    image_data: bytes,
+    mime_type: str,
+    user_prompt: str,
+) -> tuple[str, list[dict[str, str]]]:
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client()
+    prompt = f"""
+你是家居识图与选购助手。请根据用户上传的图片识别最主要的一件家具或软装对象，并用简体中文输出。
+
+如果画面里有多个物件，只聚焦最显眼、最值得购买的那一件。
+如果无法确认同款，请明确写“更像相似款”。
+不要输出 JSON。
+
+请严格按下面格式输出：
+识别对象：<一句话概括，例如“奶油风弧形布艺沙发”>
+家具类型：<品类>
+风格判断：<风格关键词，2-4个>
+材质/颜色：<材质和颜色>
+适用空间：<适合客厅/卧室/书房等>
+搜索关键词：<适合搜索购买链接的短关键词，尽量精确>
+购买建议：<一句简短建议，告诉用户买的时候重点关注什么>
+
+用户补充要求：{user_prompt or "请帮我识别并给购买链接。"}
+"""
+
+    response = client.models.generate_content(
+        model="gemini-3-flash-preview",
+        contents=[
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(text=prompt),
+                    types.Part.from_bytes(data=image_data, mime_type=mime_type or "image/png"),
+                ],
+            )
+        ],
+    )
+    analysis_text = normalize_assistant_output((response.text or "").strip())
+
+    keywords = extract_search_keywords(analysis_text)
+    query = keywords or "家具 同款 购买"
+    shopping_links = await search_furniture_purchase_links(query)
+
+    lines = [analysis_text]
+    if shopping_links:
+        lines.extend(
+            [
+                "",
+                "可参考购买链接：",
+                *[
+                    f"- [{strip_section_prefix(link.get('title') or '购买链接')}]({link.get('url')})"
+                    for link in shopping_links
+                ],
+            ]
+        )
+
+    return "\n".join(lines).strip(), shopping_links
+
+
 async def queue_render_job(
     *,
     user_id: str,
@@ -886,6 +1042,40 @@ async def recommended_prompts_endpoint(user_id: str = DEFAULT_USER, limit: int =
 async def google_links_endpoint(payload: GoogleLinksRequest):
     links = await google_cse_search(payload.query, max_results=payload.max_results)
     return {"links": links}
+
+
+@app.post("/api/vision/furniture-match", response_model=VisionShoppingResponse)
+async def furniture_match_endpoint(
+    image: UploadFile = File(...),
+    prompt: str = Form("请识别这件家具，并给我购买链接。"),
+    user_id: str = Form(DEFAULT_USER),
+    session_id: str = Form(DEFAULT_SESSION),
+):
+    require_api_key()
+    ensure_session(session_id=session_id, user_id=user_id, title="识图找同款")
+
+    image_data = await image.read()
+    if not image_data:
+        raise HTTPException(status_code=400, detail="上传图片不能为空。")
+
+    assistant_message, references = await analyze_furniture_image_with_links(
+        image_data=image_data,
+        mime_type=image.content_type or "image/png",
+        user_prompt=prompt,
+    )
+    save_message(
+        session_id=session_id,
+        user_id=user_id,
+        role="user",
+        content=prompt,
+    )
+    save_message(
+        session_id=session_id,
+        user_id=user_id,
+        role="assistant",
+        content=assistant_message,
+    )
+    return VisionShoppingResponse(message=assistant_message, references=references)
 
 
 @app.post("/api/local-render-map", response_model=LocalRenderResponse)

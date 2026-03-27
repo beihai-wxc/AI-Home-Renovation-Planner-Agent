@@ -298,6 +298,33 @@ export async function sendChatWithImageStream(
   }
 }
 
+export async function analyzeFurnitureMatch(
+  image: File,
+  sessionId: string,
+  prompt = "请识别这件家具，并给我购买链接。"
+): Promise<{
+  message: string;
+  references?: Array<{ title: string; url: string; snippet?: string; source?: string }>;
+}> {
+  const formData = new FormData();
+  formData.append("image", image);
+  formData.append("prompt", prompt);
+  formData.append("user_id", DEFAULT_USER_ID);
+  formData.append("session_id", sessionId);
+
+  const response = await fetch(`${API_BASE_URL}/api/vision/furniture-match`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || error.message || "识图找同款失败");
+  }
+
+  return await response.json();
+}
+
 export async function checkBackendHealth(): Promise<{ status: string; api_key_configured: boolean }> {
   const response = await fetch(`${API_BASE_URL}/api/health`);
   return await response.json();

@@ -207,24 +207,19 @@ export default function HomePage() {
                   behavior: "smooth",
                 });
               }}
-              className="absolute bottom-5 right-2 hidden select-none flex-col items-center rounded-full border border-[#8B6F47]/20 bg-white/65 px-2 py-3 text-[#8B6F47]/85 shadow-[0_8px_24px_rgba(139,111,71,0.16)] backdrop-blur-md transition-all hover:border-[#8B6F47]/35 hover:bg-white/80 sm:flex"
+              className="absolute bottom-12 left-[calc(50%-40px)] z-10 flex -translate-x-1/2 select-none items-center justify-center text-[#8B6F47] transition-all hover:scale-105 hover:text-[#6E532F]"
               aria-label="下拉了解我们"
             >
-              <span
-                className="text-[11px] font-medium tracking-[0.08em]"
-                style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
-              >
-                下拉了解我们
-              </span>
               <motion.svg
-                className="mt-2 h-4 w-4"
-                viewBox="0 0 24 24"
+                className="h-20 w-20"
+                viewBox="0 0 72 72"
                 fill="none"
                 stroke="currentColor"
-                animate={{ y: [0, 4, 0] }}
-                transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                animate={{ y: [0, 8, 0], opacity: [0.78, 1, 0.78] }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={5} d="M18 24l18 18 18-18" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={5} d="M18 40l18 18 18-18" opacity="0.6" />
               </motion.svg>
             </motion.button>
           )}

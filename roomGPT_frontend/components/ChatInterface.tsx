@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  analyzeFurnitureMatch,
   fetchRecommendedPrompts,
   fetchRenderJob,
   fetchSessionMessages,
@@ -30,14 +31,14 @@ interface PendingImage {
   id: string;
   file: File;
   previewUrl: string;
-  kind: "current_room" | "inspiration";
+  kind: "general" | "current_room" | "inspiration" | "vision_match";
 }
 
 interface FailedDraft {
   content: string;
   uploads: Array<{
     file: File;
-    kind: "current_room" | "inspiration";
+    kind: "general" | "current_room" | "inspiration" | "vision_match";
   }>;
 }
 
@@ -66,15 +67,24 @@ function generateFollowUpPrompts(content: string): string[] {
   return Array.from(new Set(prompts)).slice(0, 3);
 }
 
-function getAttachmentTone(kind?: "current_room" | "inspiration") {
+function getAttachmentTone(kind?: "general" | "current_room" | "inspiration" | "vision_match") {
+  if (kind === "general") {
+    return "bg-[#EDF3FB] text-[#4B6785] ring-1 ring-[#C7D6E8]/75";
+  }
   if (kind === "inspiration") {
     return "bg-[#F3EFE8] text-[#7A6A52] ring-1 ring-[#C9BBA5]/60";
+  }
+  if (kind === "vision_match") {
+    return "bg-[#EEF5F0] text-[#4C7560] ring-1 ring-[#B9D0C2]/70";
   }
   return "bg-white/18 text-white/95 ring-1 ring-white/18";
 }
 
-function getPendingImageLabel(kind: "current_room" | "inspiration", index: number) {
-  return kind === "current_room" ? `原图 ${index + 1}` : `灵感图 ${index + 1}`;
+function getPendingImageLabel(kind: "general" | "current_room" | "inspiration" | "vision_match", index: number) {
+  if (kind === "general") return `图片 ${index + 1}`;
+  if (kind === "current_room") return `原图 ${index + 1}`;
+  if (kind === "inspiration") return `灵感图 ${index + 1}`;
+  return `识图 ${index + 1}`;
 }
 
 export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps) {
@@ -83,8 +93,8 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [showQuickScenes, setShowQuickScenes] = useState(false);
-  const [showUploadMenu, setShowUploadMenu] = useState(false);
-  const [pendingUploadKind, setPendingUploadKind] = useState<"current_room" | "inspiration">("current_room");
+  const [showInspirationComposer, setShowInspirationComposer] = useState(false);
+  const [pendingUploadKind, setPendingUploadKind] = useState<"general" | "current_room" | "inspiration" | "vision_match">("general");
   const [pendingRenderJobId, setPendingRenderJobId] = useState<string | null>(null);
   const [failedDraft, setFailedDraft] = useState<FailedDraft | null>(null);
   const [recommendedPrompts, setRecommendedPrompts] = useState<string[]>([]);
@@ -104,7 +114,6 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentRoomInputRef = useRef<HTMLInputElement>(null);
   const pendingImagesRef = useRef<PendingImage[]>([]);
-  const uploadMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     pendingImagesRef.current = pendingImages;
@@ -114,17 +123,6 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     return () => {
       pendingImagesRef.current.forEach((image) => URL.revokeObjectURL(image.previewUrl));
     };
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!uploadMenuRef.current?.contains(event.target as Node)) {
-        setShowUploadMenu(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -229,7 +227,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
 
   const buildImageId = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 
-  const appendSelectedImages = (files: File[], kind: "current_room" | "inspiration") => {
+  const appendSelectedImages = (files: File[], kind: "general" | "current_room" | "inspiration" | "vision_match") => {
     if (!files.length) return;
 
     setPendingImages((prev) => {
@@ -254,7 +252,6 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     if (currentRoomInputRef.current) {
       currentRoomInputRef.current.value = "";
     }
-    setShowUploadMenu(false);
   };
 
   const removeSelectedImage = (id: string) => {
@@ -286,12 +283,18 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     const finalInput = (customMessage ?? input).trim();
     if ((!finalInput && !pendingImages.length) || isSending) return;
 
+    const generalFiles = pendingImages.filter((image) => image.kind === "general").map((image) => image.file);
     const currentRoomFiles = pendingImages.filter((image) => image.kind === "current_room").map((image) => image.file);
     const inspirationFiles = pendingImages.filter((image) => image.kind === "inspiration").map((image) => image.file);
-    const outgoingAttachments = pendingImages.map((image, index) => ({
+    const outgoingAttachments = pendingImages.map((image) => ({
       id: image.id,
       url: URL.createObjectURL(image.file),
-      label: image.kind === "current_room" ? `原图 ${currentRoomFiles.indexOf(image.file) + 1}` : `灵感图 ${inspirationFiles.indexOf(image.file) + 1}`,
+      label:
+        image.kind === "general"
+          ? `图片 ${generalFiles.indexOf(image.file) + 1}`
+          : image.kind === "current_room"
+          ? `原图 ${currentRoomFiles.indexOf(image.file) + 1}`
+          : `灵感图 ${inspirationFiles.indexOf(image.file) + 1}`,
       kind: image.kind,
     }));
 
@@ -389,6 +392,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
         )
       );
       clearSelectedImages();
+      setShowInspirationComposer(false);
       setTimeout(() => setActiveAssistantMessageId(null), 1200);
       showToast("回复已生成", "success");
     };
@@ -416,7 +420,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
         await sendChatWithImageStream(
           userMessage.content,
           {
-            currentRoomImages: currentRoomFiles,
+            currentRoomImages: [...generalFiles, ...currentRoomFiles],
             inspirationImages: inspirationFiles,
           },
           (content) => {
@@ -464,8 +468,107 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     }
   };
 
+  const generalPendingImages = pendingImages.filter((image) => image.kind === "general");
   const currentRoomPendingImages = pendingImages.filter((image) => image.kind === "current_room");
   const inspirationPendingImages = pendingImages.filter((image) => image.kind === "inspiration");
+
+  const triggerFilePicker = (kind: "general" | "current_room" | "inspiration" | "vision_match") => {
+    if (isSending) return;
+    setPendingUploadKind(kind);
+    currentRoomInputRef.current?.click();
+  };
+
+  const handleInspirationBlend = () => {
+    setShowInspirationComposer((prev) => !prev);
+    if (!showInspirationComposer && !input.trim()) {
+      setInput("请结合我上传的原图和灵感图，给我一套融合后的装修方案。");
+    }
+  };
+
+  const handleVisionMatch = async (file: File) => {
+    const attachmentUrl = URL.createObjectURL(file);
+    const userMessageId = `vision-user-${Date.now()}`;
+    const assistantMessageId = `vision-ai-${Date.now() + 1}`;
+
+    setIsSending(true);
+    setActiveAssistantMessageId(assistantMessageId);
+    setAgentStatuses((prev) =>
+      prev.map((agent) =>
+        agent.agentName === "VisualAssessor"
+          ? { ...agent, status: "processing", message: "正在识图找同款..." }
+          : { ...agent, status: "idle", message: undefined }
+      )
+    );
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: userMessageId,
+        role: "user",
+        content: "请识别这件家具，并给我购买链接。",
+        attachments: [
+          {
+            id: `vision-${file.name}-${file.lastModified}`,
+            url: attachmentUrl,
+            label: "识图找同款",
+            kind: "vision_match",
+          },
+        ],
+        timestamp: new Date(),
+      },
+      {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "正在识别家具并搜索购买链接...",
+        timestamp: new Date(),
+        agentName: "VisualAssessor",
+      },
+    ]);
+
+    try {
+      const result = await analyzeFurnitureMatch(file, sessionId);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMessageId
+            ? {
+                ...msg,
+                content: result.message,
+                references: result.references,
+                followUpPrompts: [
+                  "帮我找更便宜的相似款",
+                  "这件家具适合什么装修风格",
+                  "如果放进我家客厅要怎么搭配",
+                ],
+              }
+            : msg
+        )
+      );
+      setAgentStatuses((prev) =>
+        prev.map((agent) =>
+          agent.agentName === "VisualAssessor"
+            ? { ...agent, status: "completed", message: "识图完成" }
+            : agent
+        )
+      );
+      showToast("识图找同款已完成", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "识图找同款失败";
+      setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessageId));
+      onError?.(message);
+      showToast(message, "error");
+      setAgentStatuses((prev) =>
+        prev.map((agent) =>
+          agent.agentName === "VisualAssessor"
+            ? { ...agent, status: "error", message }
+            : agent
+        )
+      );
+    } finally {
+      setIsSending(false);
+      setTimeout(() => setActiveAssistantMessageId(null), 1200);
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -716,43 +819,41 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           <div className="mb-1.5">
             <QuickPrompts
               onSelect={handleSelectQuickPrompt}
-              onSceneToggle={() => setShowQuickScenes((prev) => !prev)}
-              sceneActive={showQuickScenes}
             />
           </div>
         )}
 
-        <div className="mb-2 space-y-2">
-          {currentRoomPendingImages.length > 0 && (
+        <div className="mb-3 space-y-2">
+          {generalPendingImages.length > 0 && (
             <div>
-              <div className="mb-1 text-[11px] font-medium text-[#8B6F47]">原图</div>
+              <div className="mb-1 text-[11px] font-medium text-[#4B6785]">已上传图片</div>
               <div className="flex flex-wrap gap-2">
-                {currentRoomPendingImages.map((image, index) => (
+                {generalPendingImages.map((image, index) => (
                   <div
                     key={image.id}
-                    className="relative inline-flex max-w-[240px] items-center gap-2 rounded-full border border-[#8B6F47]/18 bg-white/85 px-2.5 py-1.5 shadow-sm"
+                    className="relative inline-flex max-w-[240px] items-center gap-2 rounded-full border border-[#C7D6E8]/70 bg-[#F6FAFF] px-2.5 py-1.5 shadow-sm"
                   >
                     <button
                       type="button"
                       className="flex items-center gap-2"
                       onClick={() => {
                         setPreviewImageUrl(image.previewUrl);
-                        setPreviewTitle(getPendingImageLabel("current_room", index));
+                        setPreviewTitle(getPendingImageLabel("general", index));
                       }}
                     >
                       <img
                         src={image.previewUrl}
-                        alt={getPendingImageLabel("current_room", index)}
-                        className="h-7 w-7 rounded-full object-cover ring-1 ring-[#8B6F47]/10"
+                        alt={getPendingImageLabel("general", index)}
+                        className="h-7 w-7 rounded-full object-cover ring-1 ring-[#C7D6E8]/70"
                       />
-                      <span className="truncate text-xs font-medium text-[#5A5A5A]">
-                        {getPendingImageLabel("current_room", index)}
+                      <span className="truncate text-xs font-medium text-[#4B6785]">
+                        {getPendingImageLabel("general", index)}
                       </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => removeSelectedImage(image.id)}
-                      className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#F4ECE3] text-[11px] text-[#8B6F47] transition hover:bg-[#EADBC8]"
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#E8F0F8] text-[11px] text-[#4B6785] transition hover:bg-[#DCE8F4]"
                     >
                       ✕
                     </button>
@@ -762,136 +863,241 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
             </div>
           )}
 
-          {inspirationPendingImages.length > 0 && (
-            <div>
-              <div className="mb-1 text-[11px] font-medium text-[#7A6A52]">灵感图</div>
-              <div className="flex flex-wrap gap-2">
-                {inspirationPendingImages.map((image, index) => (
-                  <div
-                    key={image.id}
-                    className="relative inline-flex max-w-[240px] items-center gap-2 rounded-full border border-[#C9BBA5]/45 bg-[#FBF7F1] px-2.5 py-1.5 shadow-sm"
-                  >
-                    <button
-                      type="button"
-                      className="flex items-center gap-2"
-                      onClick={() => {
-                        setPreviewImageUrl(image.previewUrl);
-                        setPreviewTitle(getPendingImageLabel("inspiration", index));
-                      }}
-                    >
-                      <img
-                        src={image.previewUrl}
-                        alt={getPendingImageLabel("inspiration", index)}
-                        className="h-7 w-7 rounded-full object-cover ring-1 ring-[#C9BBA5]/45"
-                      />
-                      <span className="truncate text-xs font-medium text-[#6B6459]">
-                        {getPendingImageLabel("inspiration", index)}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeSelectedImage(image.id)}
-                      className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#F4ECE3] text-[11px] text-[#8B6F47] transition hover:bg-[#EADBC8]"
-                    >
-                      ✕
-                    </button>
+          {showInspirationComposer && (
+            <div className="rounded-2xl border border-[#8B6F47]/15 bg-white/72 p-3 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[#2D2D2D]">灵感结合</div>
+                  <div className="text-xs text-[#6B6459]">分别上传原图和灵感图，AI 会结合两者输出融合方案。</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowInspirationComposer(false)}
+                  className="rounded-full border border-[#8B6F47]/15 bg-white px-3 py-1 text-xs text-[#6B6459] transition hover:bg-[#F7F1E7]"
+                >
+                  收起
+                </button>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => triggerFilePicker("current_room")}
+                  disabled={isSending}
+                  className="rounded-full border border-[#8B6F47]/20 bg-white px-3 py-1.5 text-xs font-medium text-[#8B6F47] transition hover:bg-[#F9F4EC] disabled:opacity-60"
+                >
+                  上传原图
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerFilePicker("inspiration")}
+                  disabled={isSending}
+                  className="rounded-full border border-[#C9BBA5]/45 bg-[#FBF7F1] px-3 py-1.5 text-xs font-medium text-[#7A6A52] transition hover:bg-[#F7F0E6] disabled:opacity-60"
+                >
+                  上传灵感图
+                </button>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {currentRoomPendingImages.length > 0 && (
+                  <div>
+                    <div className="mb-1 text-[11px] font-medium text-[#8B6F47]">原图</div>
+                    <div className="flex flex-wrap gap-2">
+                      {currentRoomPendingImages.map((image, index) => (
+                        <div
+                          key={image.id}
+                          className="relative inline-flex max-w-[240px] items-center gap-2 rounded-full border border-[#8B6F47]/18 bg-white/85 px-2.5 py-1.5 shadow-sm"
+                        >
+                          <button
+                            type="button"
+                            className="flex items-center gap-2"
+                            onClick={() => {
+                              setPreviewImageUrl(image.previewUrl);
+                              setPreviewTitle(getPendingImageLabel("current_room", index));
+                            }}
+                          >
+                            <img
+                              src={image.previewUrl}
+                              alt={getPendingImageLabel("current_room", index)}
+                              className="h-7 w-7 rounded-full object-cover ring-1 ring-[#8B6F47]/10"
+                            />
+                            <span className="truncate text-xs font-medium text-[#5A5A5A]">
+                              {getPendingImageLabel("current_room", index)}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeSelectedImage(image.id)}
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#F4ECE3] text-[11px] text-[#8B6F47] transition hover:bg-[#EADBC8]"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {inspirationPendingImages.length > 0 && (
+                  <div>
+                    <div className="mb-1 text-[11px] font-medium text-[#7A6A52]">灵感图</div>
+                    <div className="flex flex-wrap gap-2">
+                      {inspirationPendingImages.map((image, index) => (
+                        <div
+                          key={image.id}
+                          className="relative inline-flex max-w-[240px] items-center gap-2 rounded-full border border-[#C9BBA5]/45 bg-[#FBF7F1] px-2.5 py-1.5 shadow-sm"
+                        >
+                          <button
+                            type="button"
+                            className="flex items-center gap-2"
+                            onClick={() => {
+                              setPreviewImageUrl(image.previewUrl);
+                              setPreviewTitle(getPendingImageLabel("inspiration", index));
+                            }}
+                          >
+                            <img
+                              src={image.previewUrl}
+                              alt={getPendingImageLabel("inspiration", index)}
+                              className="h-7 w-7 rounded-full object-cover ring-1 ring-[#C9BBA5]/45"
+                            />
+                            <span className="truncate text-xs font-medium text-[#6B6459]">
+                              {getPendingImageLabel("inspiration", index)}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeSelectedImage(image.id)}
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#F4ECE3] text-[11px] text-[#8B6F47] transition hover:bg-[#EADBC8]"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
         </div>
 
-        <div className="flex items-end gap-2.5">
-          <div className="flex-1 min-w-0">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="输入您的问题或描述装修需求..."
-              className="w-full min-h-[44px] leading-5 bg-white/85 text-[#2D2D2D] rounded-2xl px-4 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#8B6F47]/40 transition placeholder:text-[#8A8A8A] border border-[#8B6F47]/15"
-              rows={1}
-              disabled={isSending}
-            />
+        <div className="rounded-[24px] border border-[#8B6F47]/12 bg-white/90 px-3 py-2.5 shadow-[0_10px_26px_rgba(139,111,71,0.08)] backdrop-blur-md">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="发消息，描述你的装修需求..."
+            className="w-full min-h-[44px] resize-none border-0 bg-transparent px-2 py-1 text-[15px] leading-6 text-[#2D2D2D] outline-none ring-0 ring-transparent shadow-none focus:border-0 focus:outline-none focus:ring-0 focus:ring-transparent focus:shadow-none focus-visible:outline-none focus-visible:ring-0 placeholder:text-[#A0978B]"
+            rows={1}
+            disabled={isSending}
+          />
 
-            <input
-              type="file"
-              ref={currentRoomInputRef}
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []);
-                if (files.length) appendSelectedImages(files, pendingUploadKind);
-              }}
-              accept="image/*"
-              multiple
-              className="hidden"
-              disabled={isSending}
-            />
-          </div>
+          <input
+            type="file"
+            ref={currentRoomInputRef}
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              if (!files.length) return;
+              if (pendingUploadKind === "vision_match") {
+                if (files.length > 1) {
+                  showToast("识图找同款一次只支持 1 张图片，已使用第一张。", "info");
+                }
+                void handleVisionMatch(files[0]);
+                if (currentRoomInputRef.current) {
+                  currentRoomInputRef.current.value = "";
+                }
+                return;
+              }
+              appendSelectedImages(files, pendingUploadKind);
+            }}
+            accept="image/*"
+            multiple
+            className="hidden"
+            disabled={isSending}
+          />
 
-          <div className="relative" ref={uploadMenuRef}>
+          <div className="mt-1.5 flex items-center justify-between gap-3 border-t border-[#8B6F47]/8 px-1 pt-2.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => triggerFilePicker("general")}
+                disabled={isSending}
+                className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-[#4B6785] transition hover:bg-[#EDF3FB] disabled:opacity-60"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.44 11.05l-8.49 8.49a5.5 5.5 0 01-7.78-7.78l9.2-9.19a3.5 3.5 0 114.95 4.95l-9.19 9.2a1.5 1.5 0 01-2.12-2.13l8.49-8.48" />
+                </svg>
+                图像上传
+              </button>
+              <button
+                type="button"
+                onClick={() => triggerFilePicker("vision_match")}
+                disabled={isSending}
+                className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-[#4C7560] transition hover:bg-[#EEF5F0] disabled:opacity-60"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35" />
+                </svg>
+                识图找同款
+              </button>
+              <button
+                type="button"
+                onClick={handleInspirationBlend}
+                disabled={isSending}
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 ${
+                  showInspirationComposer
+                    ? "bg-[#8B6F47] text-white shadow-md"
+                    : "text-[#8B6F47] hover:bg-[#F7F1E7]"
+                }`}
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h5l2 3h11" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 21l3-9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 12l3 9" />
+                </svg>
+                灵感结合
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowQuickScenes((prev) => !prev)}
+                disabled={isSending}
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 ${
+                  showQuickScenes
+                    ? "bg-[#7A9E7E] text-white shadow-md"
+                    : "text-[#5C7B60] hover:bg-[#EEF5EF]"
+                }`}
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 12h10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 17h4" />
+                </svg>
+                场景选择
+              </button>
+            </div>
+
             <button
-              onClick={() => !isSending && setShowUploadMenu((prev) => !prev)}
-              disabled={isSending}
-              title="上传图片"
-              type="button"
-              className={`h-[56px] w-[56px] inline-flex items-center justify-center rounded-2xl border transition ${
-                isSending
-                  ? "bg-white/60 text-[#8A8A8A] border-[#8B6F47]/15 cursor-not-allowed"
-                  : "bg-white/85 text-[#6B6459] border-[#8B6F47]/20 hover:bg-white hover:text-[#2D2D2D]"
+              onClick={() => {
+                void handleSendMessage();
+              }}
+              disabled={isSending || (!input.trim() && !pendingImages.length)}
+              title="发送"
+              className={`group relative inline-flex h-10 w-10 shrink-0 items-center justify-center self-end overflow-hidden rounded-full border transition-all duration-300 ${
+                isSending || (!input.trim() && !pendingImages.length)
+                  ? "border-[#E6DED2] bg-[#F4EFE8] text-[#B3A797] cursor-not-allowed"
+                  : "border-[#B79662]/30 bg-[linear-gradient(135deg,#8B6F47_0%,#A68B5B_55%,#C8A56D_100%)] text-white shadow-[0_10px_24px_rgba(139,111,71,0.24)] hover:border-[#C8A56D]/40 hover:shadow-[0_14px_30px_rgba(139,111,71,0.30)]"
               }`}
             >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="5" width="18" height="14" rx="2" />
-                <circle cx="9" cy="10" r="1.5" />
-                <path d="M21 15l-4-4-6 6-2-2-4 4" />
+              {!isSending && (input.trim() || pendingImages.length > 0) && (
+                <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.38),transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.08),transparent_70%)]" />
+              )}
+              <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14" />
+                <path d="M7 10l5-5 5 5" />
               </svg>
             </button>
-
-            {showUploadMenu && !isSending && (
-              <div className="absolute bottom-[64px] right-0 z-20 w-40 rounded-2xl border border-[#8B6F47]/15 bg-white/95 p-1.5 shadow-xl backdrop-blur-md">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPendingUploadKind("current_room");
-                    currentRoomInputRef.current?.click();
-                  }}
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-[#2D2D2D] transition hover:bg-[#F9F4EC]"
-                >
-                  <span>上传原图</span>
-                  <span className="text-xs text-[#8B6F47]">房间照片</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPendingUploadKind("inspiration");
-                    currentRoomInputRef.current?.click();
-                  }}
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-[#2D2D2D] transition hover:bg-[#F9F4EC]"
-                >
-                  <span>上传灵感图</span>
-                  <span className="text-xs text-[#7A6A52]">风格参考</span>
-                </button>
-              </div>
-            )}
           </div>
-
-          <button
-            onClick={() => {
-              void handleSendMessage();
-            }}
-            disabled={isSending || (!input.trim() && !pendingImages.length)}
-            title="发送"
-            className={`h-[56px] w-[56px] inline-flex items-center justify-center rounded-2xl transition-all duration-300 ${
-              isSending || (!input.trim() && !pendingImages.length)
-                ? "bg-white/60 text-[#8A8A8A] cursor-not-allowed"
-                : "bg-gradient-to-r from-[#8B6F47] to-[#A68B5B] text-white shadow-lg shadow-[#8B6F47]/25 hover:shadow-[#8B6F47]/40"
-            }`}
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 2L11 13" />
-              <path d="M22 2L15 22l-4-9-9-4 20-7z" />
-            </svg>
-          </button>
         </div>
       </div>
       <ImageLightbox
