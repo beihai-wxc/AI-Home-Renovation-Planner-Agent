@@ -1,310 +1,200 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* ========== 配色方案 ========== */
+    /* 主色 - 奶油色 (页面背景) */
+    --color-primary: #fcf9f8;
+
+    /* 次色 - 莫兰迪棕 (卡片背景、输入框边框、中性文本) */
+    --color-secondary: #bdb3a5;
+
+    /* 点缀色 - 深巧克力棕 (导航栏背景、主要按钮、标题文本) */
+    --color-accent: #4e3c30;
+    --color-accent-dark: #3d2f26;
+
+    /* 文本色 - 深色调 */
+    --text-primary: #4e3c30;
+    --text-secondary: #9f8370;
+    --text-tertiary: #bdb3a5;
+
+    /* 表面颜色 */
+    --surface-1: #fcf9f8;
+    --surface-2: #f7f3f0;
+    --surface-3: #f2ebe7;
+
+    /* 边框颜色 */
+    --border-subtle: #e8e4df;
+    --border-default: #d4cec5;
+    --border-strong: #bdb3a5;
+
+    /* 阴影 */
+    --shadow-sm: 0 1px 2px rgba(78, 60, 48, 0.05);
+    --shadow-md: 0 4px 12px rgba(78, 60, 48, 0.08);
+    --shadow-lg: 0 8px 24px rgba(78, 60, 48, 0.12);
+    --shadow-xl: 0 16px 40px rgba(78, 60, 48, 0.16);
+  }
+
   html,
   body {
-    font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", "Segoe UI", sans-serif;
+    font-family: "Outfit", "Noto Sans SC", system-ui, -apple-system, sans-serif;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* 字体层级 */
+  .font-display {
+    font-family: "Playfair Display", "Noto Sans SC", serif;
+  }
+
+  .font-body {
+    font-family: "Outfit", "Noto Sans SC", system-ui, sans-serif;
+  }
 }
 
 @layer components {
-  .cn-latin-heading {
-    font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", sans-serif;
-    font-kerning: normal;
+  /* ========== 现代卡片 ========== */
+  .card-modern {
+    position: relative;
+    background: var(--surface-2);
+    border: 1px solid var(--border-default);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: var(--shadow-md);
   }
 
-  .cn-latin-copy {
-    font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", sans-serif;
-    font-kerning: normal;
+  .card-modern:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--border-strong);
   }
 
-  .agent-index-label {
-    letter-spacing: 0.14em;
-    font-variant-numeric: tabular-nums;
+  /* ========== 主按钮 ========== */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 28px;
+    font-family: "Outfit", "Noto Sans SC", sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #fcf9f8;
+    background: var(--color-accent);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: var(--shadow-md);
   }
-}
 
-/* ========== 温暖家居配色变量 ========== */
-:root {
-  --color-cream: #FAF8F5;
-  --color-cream-dark: #F5F1EB;
-  --color-wood: #8B6F47;
-  --color-wood-light: #A68B5B;
-  --color-plant: #7A9E7E;
-  --color-plant-light: #9DBF9F;
-  --color-earth: #C9B896;
-  --color-text-primary: #2D2D2D;
-  --color-text-secondary: #5A5A5A;
-  --color-text-tertiary: #8A8A8A;
-}
-
-/* ========== 主页背景 - 温暖米色系 ========== */
-.home-cinematic::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -20;
-  background:
-    radial-gradient(ellipse at 20% 30%, rgba(139, 111, 71, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 70%, rgba(122, 158, 126, 0.06) 0%, transparent 50%),
-    linear-gradient(180deg, #FAF8F5 0%, #F5F1EB 50%, #FAF8F5 100%);
-}
-
-/* 精细纹理叠加 */
-.home-cinematic::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -19;
-  background-image:
-    radial-gradient(circle at 25% 25%, rgba(139, 111, 71, 0.02) 0%, transparent 50%),
-    radial-gradient(circle at 75% 75%, rgba(122, 158, 126, 0.02) 0%, transparent 50%);
-  opacity: 0.6;
-  animation: subtleFloat 20s ease-in-out infinite;
-}
-
-/* ========== 高级卡片悬浮效果 ========== */
-.intro-zoom-card {
-  transform: translateY(0) scale(1);
-  transform-origin: center;
-  transition: all 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 4px 20px rgba(139, 111, 71, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.intro-zoom-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 16px 48px rgba(139, 111, 71, 0.15), 0 4px 16px rgba(0, 0, 0, 0.06);
-}
-
-/* 卡片图标悬浮效果 */
-.intro-zoom-card:hover .card-icon {
-  transform: scale(1.12);
-}
-
-.intro-zoom-card .card-icon {
-  transform-origin: left center;
-}
-
-/* ========== Dream 页面背景 - 温暖优雅 ========== */
-.dream-background {
-  background:
-    radial-gradient(ellipse at 15% 25%, rgba(139, 111, 71, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 75%, rgba(122, 158, 126, 0.1) 0%, transparent 50%),
-    linear-gradient(135deg, #FAF8F5 0%, #F5F1EB 50%, #FAF8F5 100%);
-}
-
-.dream-background .animate-pulse {
-  animation: gentlePulse 6s ease-in-out infinite;
-}
-
-/* ========== 高级动画关键帧 ========== */
-@keyframes subtleFloat {
-  0%, 100% {
-    transform: translate3d(0, 0, 0);
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    background: var(--color-accent-dark);
   }
-  50% {
-    transform: translate3d(2%, -2%, 0);
-  }
-}
 
-@keyframes gentlePulse {
-  0%, 100% {
-    opacity: 0.08;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.15;
-    transform: scale(1.02);
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-  to {
-    opacity: 1;
+  .btn-primary:active {
     transform: translateY(0);
   }
-}
 
-@keyframes gradientFlow {
-  0% {
-    background-position: 0% 50%;
+  /* ========== 链接动画 ========== */
+  .link-animated {
+    position: relative;
+    text-decoration: none;
+    color: var(--text-secondary);
+    transition: color 0.3s ease;
   }
-  50% {
-    background-position: 100% 50%;
+
+  .link-animated::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--color-accent);
+    transition: width 0.3s ease;
   }
-  100% {
-    background-position: 0% 50%;
+
+  .link-animated:hover {
+    color: var(--color-accent);
   }
-}
 
-@keyframes slideInFromLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-32px);
+  .link-animated:hover::after {
+    width: 100%;
   }
-  to {
-    opacity: 1;
-    transform: translateX(0);
+
+  /* ========== 主页背景 ========== */
+  .home-background {
+    background: var(--surface-1);
   }
-}
 
-@keyframes slideInFromRight {
-  from {
-    opacity: 0;
-    transform: translateX(32px);
+  /* ========== 文本渐变 ========== */
+  .text-gradient {
+    background: linear-gradient(135deg, var(--color-accent), var(--text-secondary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
-  to {
-    opacity: 1;
-    transform: translateX(0);
+
+  /* ========== 消息气泡 ========== */
+  .message-user {
+    max-width: 70%;
+    padding: 16px 22px;
+    border-radius: 24px 24px 8px 24px;
+    background: linear-gradient(135deg, var(--color-accent) 0%, #3d2f26 100%);
+    color: #fcf9f8;
+    box-shadow: 0 4px 12px rgba(78, 60, 48, 0.15), 0 8px 24px rgba(78, 60, 48, 0.1);
+    font-family: "Outfit", "Noto Sans SC", sans-serif;
+    transition: transform 0.2s ease;
   }
-}
 
-/* ========== 按钮高级交互 ========== */
-.btn-warm {
-  position: relative;
-  overflow: hidden;
-  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.btn-warm::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  transform: translate(-50%, -50%);
-  transition: width 400ms ease, height 400ms ease;
-}
-
-.btn-warm:hover::before {
-  width: 300px;
-  height: 300px;
-}
-
-.btn-warm:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(139, 111, 71, 0.25);
-}
-
-.btn-warm:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 12px rgba(139, 111, 71, 0.2);
-}
-
-/* ========== 图片容器交互 ========== */
-.image-card {
-  transition: all 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-}
-
-.image-card:hover {
-  transform: scale(1.03);
-  box-shadow: 0 16px 48px rgba(139, 111, 71, 0.2);
-}
-
-/* ========== 链接悬浮效果 ========== */
-.link-underline {
-  position: relative;
-  text-decoration: none;
-  transition: color 300ms ease;
-}
-
-.link-underline::after {
-  content: "";
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--color-wood), var(--color-plant));
-  transition: width 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.link-underline:hover::after {
-  width: 100%;
-}
-
-/* ========== 固定导航间距 ========== */
-.header-spacer {
-  height: 72px;
-}
-
-/* ========== 骨架屏动画 ========== */
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
+  .message-assistant {
+    max-width: 85%;
+    padding: 16px 22px;
+    border-radius: 24px 24px 24px 8px;
+    background: linear-gradient(135deg, #ffffff 0%, var(--surface-2) 100%);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    box-shadow: 0 2px 8px rgba(78, 60, 48, 0.08);
+    font-family: "Outfit", "Noto Sans SC", sans-serif;
   }
-  100% {
-    background-position: 200% 0;
+
+  /* ========== 骨架屏 ========== */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
   }
-}
 
-.animate-shimmer {
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite linear;
-}
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--surface-3) 0%,
+      var(--surface-2) 50%,
+      var(--surface-3) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
 
-/* ========== Agent 时间线样式 ========== */
-.agent-timeline {
-  padding: 8px 12px;
-  background: linear-gradient(135deg, rgba(139, 111, 71, 0.05), rgba(122, 158, 126, 0.05));
-  border-radius: 8px;
-  margin-bottom: 8px;
-}
-
-.agent-timeline-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  font-size: 12px;
-  color: #5A5A5A;
-}
-
-.agent-timeline-item.processing {
-  color: #8B6F47;
-}
-
-.agent-timeline-item.completed {
-  color: #7A9E7E;
-}
-
-/* ========== 消息气泡样式 ========== */
-.message-user {
-  max-width: 60%;
-  padding: 10px 16px;
-  border-radius: 18px 18px 4px 18px;
-}
-
-.message-assistant {
-  max-width: 85%;
-  padding: 12px 16px;
-  border-radius: 18px 18px 18px 4px;
-}
-
-/* ========== 减少动画偏好 ========== */
-@media (prefers-reduced-motion: reduce) {
-  .home-cinematic::before,
-  .home-cinematic::after,
-  .dream-background .animate-pulse,
-  .intro-zoom-card,
-  .btn-warm,
-  .image-card {
-    animation: none;
-    transition: none;
+  /* ========== 减少动画偏好 ========== */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

@@ -20,7 +20,7 @@ const quickPrompts = [
 export default function QuickPrompts({ onSelect, onSceneToggle, sceneActive = false }: QuickPromptsProps) {
   return (
     <div className="mb-2">
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {quickPrompts.map((item, index) => (
           <div key={index} className="contents">
             <motion.button
@@ -28,7 +28,7 @@ export default function QuickPrompts({ onSelect, onSceneToggle, sceneActive = fa
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.05 }}
               onClick={() => onSelect?.(item.prompt)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/70 hover:bg-white border border-[#8B6F47]/20 transition text-xs text-[#5A5A5A] hover:text-[#2D2D2D]"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/70 hover:bg-white border border-secondary/20 transition text-xs text-text-secondary hover:text-accent font-body"
             >
               <span>{item.icon}</span>
               <span>{item.text}</span>
@@ -39,7 +39,7 @@ export default function QuickPrompts({ onSelect, onSceneToggle, sceneActive = fa
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 + 0.02 }}
                 onClick={onSceneToggle}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/70 hover:bg-white border border-[#8B6F47]/20 transition text-xs text-[#5A5A5A] hover:text-[#2D2D2D]"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/70 hover:bg-white border border-secondary/20 transition text-xs text-text-secondary hover:text-accent font-body"
               >
                 <span>🧩</span>
                 <span>{sceneActive ? "返回输入" : "场景选择"}</span>
