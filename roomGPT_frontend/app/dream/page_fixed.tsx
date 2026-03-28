@@ -209,6 +209,7 @@ export default function DreamPage() {
               返回首页
             </Link>
           </div>
+        </div>
       </header>
 
       {/* 温暖动态背景层 */}

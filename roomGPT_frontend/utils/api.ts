@@ -25,6 +25,19 @@ interface ImagePayload {
   inspirationImages?: File[];
 }
 
+function normalizeStreamErrorMessage(raw: string): string {
+  const text = raw || "发送消息失败";
+  const normalized = text.toLowerCase();
+  if (
+    normalized.includes("503") ||
+    normalized.includes("unavailable") ||
+    normalized.includes("high demand")
+  ) {
+    return "当前模型服务繁忙，请稍后重试。内容和图片已保留，可直接点击重新发送。";
+  }
+  return text;
+}
+
 function buildChatMessage(data: {
   id: string;
   role: "user" | "assistant";
@@ -187,6 +200,7 @@ export async function sendChatMessageStream(
   onError: (error: string) => void,
   sessionId: string
 ): Promise<void> {
+  let hasStreamError = false;
   try {
     const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
       method: "POST",
@@ -211,7 +225,8 @@ export async function sendChatMessageStream(
           return;
         }
         if (chunk.type === "error" && chunk.message) {
-          onError(chunk.message);
+          hasStreamError = true;
+          onError(normalizeStreamErrorMessage(chunk.message));
           return;
         }
         if (chunk.type === "references" && chunk.links) {
@@ -222,10 +237,14 @@ export async function sendChatMessageStream(
           onChunk(chunk.content);
         }
       },
-      onDone
+      () => {
+        if (!hasStreamError) {
+          onDone();
+        }
+      }
     );
   } catch (error) {
-    onError(error instanceof Error ? error.message : "发送消息失败");
+    onError(normalizeStreamErrorMessage(error instanceof Error ? error.message : "发送消息失败"));
   }
 }
 
@@ -241,6 +260,7 @@ export async function sendChatWithImageStream(
   onError: (error: string) => void,
   sessionId: string
 ): Promise<void> {
+  let hasStreamError = false;
   try {
     const formData = new FormData();
     formData.append("message", message);
@@ -271,7 +291,8 @@ export async function sendChatWithImageStream(
           return;
         }
         if (chunk.type === "error" && chunk.message) {
-          onError(chunk.message);
+          hasStreamError = true;
+          onError(normalizeStreamErrorMessage(chunk.message));
           return;
         }
         if (chunk.type === "image" && chunk.url) {
@@ -291,10 +312,14 @@ export async function sendChatWithImageStream(
           onChunk(chunk.content);
         }
       },
-      onDone
+      () => {
+        if (!hasStreamError) {
+          onDone();
+        }
+      }
     );
   } catch (error) {
-    onError(error instanceof Error ? error.message : "发送消息失败");
+    onError(normalizeStreamErrorMessage(error instanceof Error ? error.message : "发送消息失败"));
   }
 }
 

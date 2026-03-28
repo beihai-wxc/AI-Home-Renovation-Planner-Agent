@@ -284,15 +284,28 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     }
   };
 
-  const handleSendMessage = async (customMessage?: string) => {
+  const handleSendMessage = async (
+    customMessage?: string,
+    customUploads?: Array<{
+      file: File;
+      kind: "general" | "current_room" | "inspiration" | "vision_match";
+    }>
+  ) => {
     const finalInput = (customMessage ?? input).trim();
-    if ((!finalInput && !pendingImages.length) || isSending) return;
+    const selectedUploads =
+      customUploads ??
+      pendingImages.map((image) => ({
+        file: image.file,
+        kind: image.kind,
+      }));
 
-    const generalFiles = pendingImages.filter((image) => image.kind === "general").map((image) => image.file);
-    const currentRoomFiles = pendingImages.filter((image) => image.kind === "current_room").map((image) => image.file);
-    const inspirationFiles = pendingImages.filter((image) => image.kind === "inspiration").map((image) => image.file);
-    const outgoingAttachments = pendingImages.map((image) => ({
-      id: image.id,
+    if ((!finalInput && !selectedUploads.length) || isSending) return;
+
+    const generalFiles = selectedUploads.filter((image) => image.kind === "general").map((image) => image.file);
+    const currentRoomFiles = selectedUploads.filter((image) => image.kind === "current_room").map((image) => image.file);
+    const inspirationFiles = selectedUploads.filter((image) => image.kind === "inspiration").map((image) => image.file);
+    const outgoingAttachments = selectedUploads.map((image, idx) => ({
+      id: `${image.kind}-${image.file.name}-${image.file.lastModified}-${idx}`,
       url: URL.createObjectURL(image.file),
       label:
         image.kind === "general"
@@ -312,7 +325,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     };
 
     const tempMessageId = (Date.now() + 1).toString();
-    const assistantAgentName = pendingImages.length ? "ProjectCoordinator" : "InfoAgent";
+    const assistantAgentName = selectedUploads.length ? "ProjectCoordinator" : "InfoAgent";
 
     setMessages((prev) => [
       ...prev,
@@ -331,6 +344,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     setFailedDraft(null);
     setActiveAssistantMessageId(tempMessageId);
     setAgentStatuses((prev) => prev.map((agent) => ({ ...agent, status: "idle", message: undefined })));
+    clearSelectedImages();
 
     let accumulatedContent = "";
 
@@ -405,7 +419,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
       setInput(userMessage.content);
       setFailedDraft({
         content: userMessage.content,
-        uploads: pendingImages.map((image) => ({ file: image.file, kind: image.kind })),
+        uploads: selectedUploads.map((image) => ({ file: image.file, kind: image.kind })),
       });
       onError?.(errorMessage);
       showToast(errorMessage, "error");
@@ -422,7 +436,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     };
 
     try {
-      if (pendingImages.length) {
+      if (selectedUploads.length) {
         await sendChatWithImageStream(
           userMessage.content,
           {
@@ -579,7 +593,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
   return (
     <div className="flex flex-col h-full font-body">
       {/* 顶部操作栏 */}
-      <div className="flex-shrink-0 px-4 pt-4">
+      <div className="flex-shrink-0 px-4 pt-0">
         <ChatActions
           onClear={handleClearMessages}
           messageCount={messages.length}
@@ -657,6 +671,11 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
                   <MarkdownRenderer content={message.content || "正在思考..."} />
                 ) : (
                   <div>
+                    {message.content && (
+                      <p className="mb-2 whitespace-pre-wrap break-words text-sm leading-6 text-white/95">
+                        {message.content}
+                      </p>
+                    )}
                     {message.attachments && message.attachments.length > 0 && (
                       <div className="mb-2 flex flex-wrap justify-end gap-2">
                         {message.attachments.map((attachment) => (
@@ -806,11 +825,9 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
 
       {/* 快速提示词面板 */}
       {!showQuickScenes && messages.length === 0 && (
-        <div className="px-4 pb-2">
+        <div className="px-4 pb-0">
           <QuickPrompts
             onSelect={handleSelectQuickPrompt}
-            onSceneToggle={() => setShowQuickScenes((prev) => !prev)}
-            sceneActive={showQuickScenes}
           />
         </div>
       )}
@@ -823,23 +840,24 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
       )}
 
       {/* 失败草稿重试区域 */}
-      <div className="px-4 pb-3">
-        {failedDraft && (
+      {failedDraft && (
+        <div className="px-4 pb-2">
           <div className="rounded-2xl border border-red-200 bg-red-50/85 px-4 py-3 text-sm text-red-700">
             <span>刚才那条消息发送失败了，内容和图片已保留，可以直接重新发送。</span>
             <button
               type="button"
-              onClick={() => void handleSendMessage()}
+              onClick={() => void handleSendMessage(failedDraft.content, failedDraft.uploads)}
               disabled={isSending}
               className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-700 transition-all duration-200 hover:bg-red-50 disabled:opacity-60"
             >
               重新发送
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="mb-3 space-y-2">
+      {(generalPendingImages.length > 0 || showInspirationComposer) && (
+      <div className="space-y-2 px-4 pb-2">
           {generalPendingImages.length > 0 && (
             <div>
               <div className="mb-1 text-[11px] font-medium text-[#4B6785]">已上传图片</div>
@@ -996,17 +1014,17 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
             </div>
           )}
         </div>
+      )}
 
       {/* 底部输入区域 */}
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-4 pt-0">
         <div className="rounded-[24px] border border-[#8B6F47]/12 bg-white/90 px-3 py-2.5 shadow-[0_10px_26px_rgba(139,111,71,0.08)] backdrop-blur-md">
-          <textarea
+          <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             placeholder="发消息，描述你的装修需求..."
-            className="w-full min-h-[44px] resize-none border-0 bg-transparent px-2 py-1 text-[15px] leading-6 text-[#2D2D2D] outline-none ring-0 ring-transparent shadow-none focus:border-0 focus:outline-none focus:ring-0 focus:ring-transparent focus:shadow-none focus-visible:outline-none focus-visible:ring-0 placeholder:text-[#A0978B]"
-            rows={1}
+            className="h-6 w-full border-0 bg-transparent px-2 py-0 text-[15px] leading-6 text-[#2D2D2D] outline-none ring-0 ring-transparent shadow-none focus:border-0 focus:outline-none focus:ring-0 focus:ring-transparent focus:shadow-none focus-visible:outline-none focus-visible:ring-0 placeholder:text-[#A0978B]"
             disabled={isSending}
           />
 
@@ -1035,14 +1053,14 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           />
 
           <div className="mt-1.5 flex items-center justify-between gap-3 border-t border-[#8B6F47]/8 px-1 pt-2.5">
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1">
               <button
                 type="button"
                 onClick={() => triggerFilePicker("general")}
                 disabled={isSending}
-                className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-[#4B6785] transition hover:bg-[#EDF3FB] disabled:opacity-60"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium text-[#4B6785] transition hover:bg-[#EDF3FB] disabled:opacity-60"
               >
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.44 11.05l-8.49 8.49a5.5 5.5 0 01-7.78-7.78l9.2-9.19a3.5 3.5 0 114.95 4.95l-9.19 9.2a1.5 1.5 0 01-2.12-2.13l8.49-8.48" />
                 </svg>
                 图像上传
@@ -1051,9 +1069,9 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
                 type="button"
                 onClick={() => triggerFilePicker("vision_match")}
                 disabled={isSending}
-                className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-[#4C7560] transition hover:bg-[#EEF5F0] disabled:opacity-60"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium text-[#4C7560] transition hover:bg-[#EEF5F0] disabled:opacity-60"
               >
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="11" cy="11" r="7" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35" />
                 </svg>
@@ -1063,13 +1081,13 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
                 type="button"
                 onClick={handleInspirationBlend}
                 disabled={isSending}
-                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 ${
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium transition disabled:opacity-60 ${
                   showInspirationComposer
                     ? "bg-[#8B6F47] text-white shadow-md"
                     : "text-[#8B6F47] hover:bg-[#F7F1E7]"
                 }`}
               >
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h5l2 3h11" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 21l3-9" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M18 12l3 9" />
@@ -1080,13 +1098,13 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
                 type="button"
                 onClick={() => setShowQuickScenes((prev) => !prev)}
                 disabled={isSending}
-                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 ${
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium transition disabled:opacity-60 ${
                   showQuickScenes
                     ? "bg-[#7A9E7E] text-white shadow-md"
                     : "text-[#5C7B60] hover:bg-[#EEF5EF]"
                 }`}
               >
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 12h10" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10 17h4" />

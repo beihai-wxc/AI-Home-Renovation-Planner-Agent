@@ -134,7 +134,7 @@ export default function ChatActions({
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 border-b border-[#8B6F47]/15">
+    <div className="flex h-9 items-center justify-between border-b border-[#8B6F47]/15 px-4">
       <div className="flex items-center gap-2">
         <span className="text-xs text-[#8A8A8A]">
           共 {messageCount} 条消息
@@ -146,7 +146,7 @@ export default function ChatActions({
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/70 hover:bg-white border border-[#8B6F47]/20 transition text-xs text-[#5A5A5A] hover:text-[#2D2D2D]"
+          className="flex h-8 items-center gap-1.5 rounded-lg border border-[#8B6F47]/20 bg-white/70 px-3 text-xs text-[#5A5A5A] transition hover:bg-white hover:text-[#2D2D2D]"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -158,7 +158,7 @@ export default function ChatActions({
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onClear}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 transition text-xs text-red-700 hover:text-red-800"
+          className="flex h-8 items-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/10 px-3 text-xs text-red-700 transition hover:border-red-500/30 hover:bg-red-500/20 hover:text-red-800"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
