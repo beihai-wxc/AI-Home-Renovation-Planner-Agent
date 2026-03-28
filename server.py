@@ -8,7 +8,7 @@ from html import unescape
 from pathlib import Path
 from urllib.parse import quote, urlencode
 from urllib.request import urlopen
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Callable, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -49,6 +49,8 @@ LOCAL_RENDERED_DIR = Path(os.getenv("LOCAL_RENDERED_DIR", FRONTEND_PUBLIC_ROOT /
 GOOGLE_CSE_API_KEY = os.getenv("GOOGLE_CSE_API_KEY", "").strip()
 GOOGLE_CSE_CX = os.getenv("GOOGLE_CSE_CX", "").strip()
 QUICK_GENERATE_USER = "quick_generate_user"
+UPSTREAM_503_MAX_RETRIES = max(0, int(os.getenv("UPSTREAM_503_MAX_RETRIES", "2")))
+UPSTREAM_503_BACKOFF_SECONDS = max(0.2, float(os.getenv("UPSTREAM_503_BACKOFF_SECONDS", "1.0")))
 
 app = FastAPI(title="AI Home Renovation Planner API")
 
@@ -306,6 +308,40 @@ async def extract_reply_text(events: AsyncGenerator) -> str:
                 if part.text:
                     reply_texts.append(part.text)
     return normalize_assistant_output("".join(reply_texts))
+
+
+def is_retryable_upstream_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "503" in text or "unavailable" in text or "high demand" in text
+
+
+async def backoff_sleep(attempt_index: int) -> None:
+    # Exponential backoff: 1s -> 2s -> 4s (configurable base)
+    delay = UPSTREAM_503_BACKOFF_SECONDS * (2 ** attempt_index)
+    await asyncio.sleep(delay)
+
+
+async def extract_reply_text_with_retry(
+    make_events: Callable[[], AsyncGenerator],
+    *,
+    trace_name: str,
+) -> str:
+    for attempt in range(UPSTREAM_503_MAX_RETRIES + 1):
+        try:
+            return await extract_reply_text(make_events())
+        except Exception as exc:
+            can_retry = is_retryable_upstream_error(exc) and attempt < UPSTREAM_503_MAX_RETRIES
+            if not can_retry:
+                raise
+            logger.warning(
+                "%s hit retryable upstream error (attempt %s/%s): %s",
+                trace_name,
+                attempt + 1,
+                UPSTREAM_503_MAX_RETRIES + 1,
+                exc,
+            )
+            await backoff_sleep(attempt)
+    raise RuntimeError(f"{trace_name} failed after retries.")
 
 
 async def get_result_image_filename(user_id: str, session_id: str) -> Optional[str]:
@@ -889,12 +925,17 @@ async def process_render_job(
             "如果渲染失败，请明确说明文字方案已完成，但效果图服务繁忙，建议稍后重试。"
             f"\n\n用户原始诉求：{request_message}"
         )
-        events = render_runner.run_async(
-            user_id=user_id,
-            session_id=session_id,
-            new_message=types.Content(role="user", parts=[types.Part.from_text(text=prompt)]),
+        def make_events():
+            return render_runner.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=types.Content(role="user", parts=[types.Part.from_text(text=prompt)]),
+            )
+
+        reply_text = await extract_reply_text_with_retry(
+            make_events,
+            trace_name="process_render_job",
         )
-        reply_text = await extract_reply_text(events)
         result_filename = await get_result_image_filename(user_id, session_id)
         if result_filename:
             update_render_job(job_id, status="completed", result_filename=result_filename)
@@ -1221,12 +1262,17 @@ async def chat_endpoint(request: Request, payload: ChatRequest):
 
         guarded_message = build_non_image_guarded_prompt(payload.message)
         message_content = types.Content(role="user", parts=[types.Part.from_text(text=guarded_message)])
-        events = runner.run_async(
-            user_id=payload.user_id,
-            session_id=payload.session_id,
-            new_message=message_content,
+        def make_events():
+            return runner.run_async(
+                user_id=payload.user_id,
+                session_id=payload.session_id,
+                new_message=message_content,
+            )
+
+        reply_text = await extract_reply_text_with_retry(
+            make_events,
+            trace_name="chat_endpoint",
         )
-        reply_text = await extract_reply_text(events)
         result_filename = await get_result_image_filename(payload.user_id, payload.session_id)
         references = []
         if should_include_price_links(guarded_message, reply_text):
@@ -1265,37 +1311,60 @@ async def chat_stream_endpoint(payload: ChatRequest):
 
         guarded_message = build_non_image_guarded_prompt(payload.message)
         message_content = types.Content(role="user", parts=[types.Part.from_text(text=guarded_message)])
-        events = runner.run_async(
-            user_id=payload.user_id,
-            session_id=payload.session_id,
-            new_message=message_content,
-            run_config=RunConfig(streaming_mode=StreamingMode.SSE),
-        )
-
         async def event_stream():
             partial_reply_chunks: list[str] = []
             final_reply_texts: list[str] = []
-            try:
-                async for event in events:
-                    for agent_update in iter_agent_updates(event):
-                        yield f"data: {json.dumps({'type': 'agent', **agent_update})}\n\n"
+            stream_succeeded = False
+            for attempt in range(UPSTREAM_503_MAX_RETRIES + 1):
+                try:
+                    events = runner.run_async(
+                        user_id=payload.user_id,
+                        session_id=payload.session_id,
+                        new_message=message_content,
+                        run_config=RunConfig(streaming_mode=StreamingMode.SSE),
+                    )
+                    async for event in events:
+                        for agent_update in iter_agent_updates(event):
+                            yield f"data: {json.dumps({'type': 'agent', **agent_update})}\n\n"
 
-                    text = extract_text_from_event(event)
-                    if not text:
-                        continue
+                        text = extract_text_from_event(event)
+                        if not text:
+                            continue
 
-                    if getattr(event, "partial", False):
-                        partial_reply_chunks.append(text)
-                        async for chunk in stream_text_sse(normalize_assistant_output(text)):
-                            yield chunk
-                    else:
-                        final_reply_texts.append(text)
-                        if not partial_reply_chunks:
+                        if getattr(event, "partial", False):
+                            partial_reply_chunks.append(text)
                             async for chunk in stream_text_sse(normalize_assistant_output(text)):
                                 yield chunk
-            except Exception as exc:
-                logger.error("Error during chat stream iteration: %s", exc)
-                yield f"data: {json.dumps({'type': 'error', 'message': '当前网络或模型服务暂时不稳定，请稍后重试。'})}\n\n"
+                        else:
+                            final_reply_texts.append(text)
+                            if not partial_reply_chunks:
+                                async for chunk in stream_text_sse(normalize_assistant_output(text)):
+                                    yield chunk
+                    stream_succeeded = True
+                    break
+                except Exception as exc:
+                    can_retry = (
+                        is_retryable_upstream_error(exc)
+                        and attempt < UPSTREAM_503_MAX_RETRIES
+                        and not partial_reply_chunks
+                        and not final_reply_texts
+                    )
+                    if can_retry:
+                        logger.warning(
+                            "chat_stream_endpoint retrying due to upstream 503 (attempt %s/%s): %s",
+                            attempt + 1,
+                            UPSTREAM_503_MAX_RETRIES + 1,
+                            exc,
+                        )
+                        await backoff_sleep(attempt)
+                        continue
+                    logger.error("Error during chat stream iteration: %s", exc)
+                    yield f"data: {json.dumps({'type': 'error', 'message': '当前网络或模型服务暂时不稳定，请稍后重试。'})}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+            if not stream_succeeded:
+                yield f"data: {json.dumps({'type': 'error', 'message': '当前模型服务繁忙，请稍后重试。'})}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
@@ -1389,12 +1458,17 @@ async def chat_with_image_endpoint(
             current_room_image=current_room_image,
             image=image,
         )
-        events = runner.run_async(
-            user_id=user_id,
-            session_id=session_id,
-            new_message=message_content,
+        def make_events():
+            return runner.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=message_content,
+            )
+
+        reply_text = await extract_reply_text_with_retry(
+            make_events,
+            trace_name="chat_with_image_endpoint",
         )
-        reply_text = await extract_reply_text(events)
         result_filename = await get_result_image_filename(user_id, session_id)
         references = []
         if should_include_price_links(effective_message, reply_text):
@@ -1448,37 +1522,60 @@ async def chat_with_image_stream_endpoint(
             current_room_image=current_room_image,
             image=image,
         )
-        events = runner.run_async(
-            user_id=user_id,
-            session_id=session_id,
-            new_message=message_content,
-            run_config=RunConfig(streaming_mode=StreamingMode.SSE),
-        )
-
         async def event_stream():
             partial_reply_chunks: list[str] = []
             final_reply_texts: list[str] = []
-            try:
-                async for event in events:
-                    for agent_update in iter_agent_updates(event):
-                        yield f"data: {json.dumps({'type': 'agent', **agent_update})}\n\n"
+            stream_succeeded = False
+            for attempt in range(UPSTREAM_503_MAX_RETRIES + 1):
+                try:
+                    events = runner.run_async(
+                        user_id=user_id,
+                        session_id=session_id,
+                        new_message=message_content,
+                        run_config=RunConfig(streaming_mode=StreamingMode.SSE),
+                    )
+                    async for event in events:
+                        for agent_update in iter_agent_updates(event):
+                            yield f"data: {json.dumps({'type': 'agent', **agent_update})}\n\n"
 
-                    text = extract_text_from_event(event)
-                    if not text:
-                        continue
+                        text = extract_text_from_event(event)
+                        if not text:
+                            continue
 
-                    if getattr(event, "partial", False):
-                        partial_reply_chunks.append(text)
-                        async for chunk in stream_text_sse(normalize_assistant_output(text)):
-                            yield chunk
-                    else:
-                        final_reply_texts.append(text)
-                        if not partial_reply_chunks:
+                        if getattr(event, "partial", False):
+                            partial_reply_chunks.append(text)
                             async for chunk in stream_text_sse(normalize_assistant_output(text)):
                                 yield chunk
-            except Exception as exc:
-                logger.error("Error during chat-with-image stream iteration: %s", exc)
-                yield f"data: {json.dumps({'type': 'error', 'message': '当前网络或模型服务暂时不稳定，请稍后重试。'})}\n\n"
+                        else:
+                            final_reply_texts.append(text)
+                            if not partial_reply_chunks:
+                                async for chunk in stream_text_sse(normalize_assistant_output(text)):
+                                    yield chunk
+                    stream_succeeded = True
+                    break
+                except Exception as exc:
+                    can_retry = (
+                        is_retryable_upstream_error(exc)
+                        and attempt < UPSTREAM_503_MAX_RETRIES
+                        and not partial_reply_chunks
+                        and not final_reply_texts
+                    )
+                    if can_retry:
+                        logger.warning(
+                            "chat_with_image_stream_endpoint retrying due to upstream 503 (attempt %s/%s): %s",
+                            attempt + 1,
+                            UPSTREAM_503_MAX_RETRIES + 1,
+                            exc,
+                        )
+                        await backoff_sleep(attempt)
+                        continue
+                    logger.error("Error during chat-with-image stream iteration: %s", exc)
+                    yield f"data: {json.dumps({'type': 'error', 'message': '当前网络或模型服务暂时不稳定，请稍后重试。'})}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+            if not stream_succeeded:
+                yield f"data: {json.dumps({'type': 'error', 'message': '当前模型服务繁忙，请稍后重试。'})}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
