@@ -4,8 +4,6 @@ import { motion } from "framer-motion";
 
 interface QuickPromptsProps {
   onSelect?: (prompt: string) => void;
-  onSceneToggle?: () => void;
-  sceneActive?: boolean;
 }
 
 const quickPrompts = [
@@ -17,7 +15,7 @@ const quickPrompts = [
   { icon: "📋", text: "列出所需材料清单", prompt: "请列出完成这个装修项目所需的材料清单" },
 ];
 
-export default function QuickPrompts({ onSelect, onSceneToggle, sceneActive = false }: QuickPromptsProps) {
+export default function QuickPrompts({ onSelect }: QuickPromptsProps) {
   return (
     <div className="mb-2">
       <div className="flex flex-wrap gap-2">
@@ -33,18 +31,6 @@ export default function QuickPrompts({ onSelect, onSceneToggle, sceneActive = fa
               <span>{item.icon}</span>
               <span>{item.text}</span>
             </motion.button>
-            {item.text === "列出所需材料清单" && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 + 0.02 }}
-                onClick={onSceneToggle}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/70 hover:bg-white border border-secondary/20 transition text-xs text-text-secondary hover:text-accent font-body"
-              >
-                <span>🧩</span>
-                <span>{sceneActive ? "返回输入" : "场景选择"}</span>
-              </motion.button>
-            )}
           </div>
         ))}
       </div>

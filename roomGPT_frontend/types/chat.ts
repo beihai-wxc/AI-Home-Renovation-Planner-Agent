@@ -31,6 +31,7 @@ export interface ChatMessage {
     id: string;
     url: string;
     label: string;
+    kind?: 'general' | 'current_room' | 'inspiration' | 'vision_match';
   }>;
   agentName?: string;     // 来自哪个 Agent (如: VisualAssessor, DesignPlanner, ProjectCoordinator)
   timestamp: Date;

@@ -21,7 +21,8 @@ interface StreamChunk {
 }
 
 interface ImagePayload {
-  currentRoomImage?: File | null;
+  currentRoomImages?: File[];
+  inspirationImages?: File[];
 }
 
 function buildChatMessage(data: {
@@ -246,9 +247,12 @@ export async function sendChatWithImageStream(
     formData.append("user_id", DEFAULT_USER_ID);
     formData.append("session_id", sessionId);
 
-    if (images.currentRoomImage) {
-      formData.append("current_room_image", images.currentRoomImage);
-    }
+    (images.currentRoomImages || []).forEach((file) => {
+      formData.append("current_room_images", file);
+    });
+    (images.inspirationImages || []).forEach((file) => {
+      formData.append("inspiration_images", file);
+    });
     const response = await fetch(`${API_BASE_URL}/api/chat-with-image/stream`, {
       method: "POST",
       body: formData,
@@ -292,6 +296,33 @@ export async function sendChatWithImageStream(
   } catch (error) {
     onError(error instanceof Error ? error.message : "发送消息失败");
   }
+}
+
+export async function analyzeFurnitureMatch(
+  image: File,
+  sessionId: string,
+  prompt = "请识别这件家具，并给我购买链接。"
+): Promise<{
+  message: string;
+  references?: Array<{ title: string; url: string; snippet?: string; source?: string }>;
+}> {
+  const formData = new FormData();
+  formData.append("image", image);
+  formData.append("prompt", prompt);
+  formData.append("user_id", DEFAULT_USER_ID);
+  formData.append("session_id", sessionId);
+
+  const response = await fetch(`${API_BASE_URL}/api/vision/furniture-match`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || error.message || "识图找同款失败");
+  }
+
+  return await response.json();
 }
 
 export async function checkBackendHealth(): Promise<{ status: string; api_key_configured: boolean }> {
@@ -357,7 +388,7 @@ export async function mapLocalRenderImage(
   });
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.detail || error.message || "本地图片映射失败");
+    throw new Error(error.detail || error.message || "图片生成失败");
   }
   return await response.json();
 }

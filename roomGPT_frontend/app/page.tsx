@@ -12,44 +12,44 @@ import { getCurrentUser } from "../utils/auth";
 
 const pairedSlides: PairedSlide[] = [
   {
-    beforeSrc: "/pic/pic1_before.png",
-    afterSrc: "/pic/pic1_after.png",
+    beforeSrc: "/pic/pic1_before.jpg",
+    afterSrc: "/pic/pic1_after.jpg",
     beforeAlt: "原始房间示例图 1",
     afterAlt: "生成后的房间示例图 1",
   },
   {
-    beforeSrc: "/pic/pic2_before.png",
-    afterSrc: "/pic/pic2_after.png",
+    beforeSrc: "/pic/pic2_before.jpg",
+    afterSrc: "/pic/pic2_after.jpg",
     beforeAlt: "原始房间示例图 2",
     afterAlt: "生成后的房间示例图 2",
   },
   {
-    beforeSrc: "/pic/pic3_before.png",
-    afterSrc: "/pic/pic3_after.png",
+    beforeSrc: "/pic/pic3_before.jpg",
+    afterSrc: "/pic/pic3_after.jpg",
     beforeAlt: "原始房间示例图 3",
     afterAlt: "生成后的房间示例图 3",
   },
   {
-    beforeSrc: "/pic/pic4_before.png",
-    afterSrc: "/pic/pic4_after.png",
+    beforeSrc: "/pic/pic4_before.jpg",
+    afterSrc: "/pic/pic4_after.jpg",
     beforeAlt: "原始房间示例图 4",
     afterAlt: "生成后的房间示例图 4",
   },
   {
-    beforeSrc: "/pic/pic5_before.png",
-    afterSrc: "/pic/pic5_after.png",
+    beforeSrc: "/pic/pic5_before.jpg",
+    afterSrc: "/pic/pic5_after.jpg",
     beforeAlt: "原始房间示例图 5",
     afterAlt: "生成后的房间示例图 5",
   },
   {
-    beforeSrc: "/pic/pic6_before.png",
-    afterSrc: "/pic/pic6_after.png",
+    beforeSrc: "/pic/pic6_before.jpg",
+    afterSrc: "/pic/pic6_after.jpg",
     beforeAlt: "原始房间示例图 6",
     afterAlt: "生成后的房间示例图 6",
   },
   {
-    beforeSrc: "/pic/pic7_before.png",
-    afterSrc: "/pic/pic7_after.png",
+    beforeSrc: "/pic/pic7_before.jpg",
+    afterSrc: "/pic/pic7_after.jpg",
     beforeAlt: "原始房间示例图 7",
     afterAlt: "生成后的房间示例图 7",
   },
@@ -207,22 +207,19 @@ export default function HomePage() {
                   behavior: "smooth",
                 });
               }}
-              className="absolute bottom-8 right-8 hidden select-none flex-col items-center gap-2 rounded-2xl border border-secondary bg-surface-2 px-4 py-3 text-text-secondary transition-all hover:border-accent hover:text-accent sm:flex shadow-soft"
+              className="absolute bottom-12 left-[calc(50%-40px)] z-10 flex -translate-x-1/2 select-none items-center justify-center text-[#8B6F47] transition-all hover:scale-105 hover:text-[#6E532F]"
               aria-label="下拉了解我们"
             >
-              <span className="text-xs font-medium tracking-widest uppercase">
-                了解更多
-              </span>
               <motion.svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
+                className="h-20 w-20"
+                viewBox="0 0 72 72"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth={1.5}
-                animate={{ y: [0, 4, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                animate={{ y: [0, 8, 0], opacity: [0.78, 1, 0.78] }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={5} d="M18 24l18 18 18-18" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={5} d="M18 40l18 18 18-18" opacity="0.6" />
               </motion.svg>
             </motion.button>
           )}

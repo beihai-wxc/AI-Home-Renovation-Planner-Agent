@@ -11,7 +11,6 @@ import ChatInterface from "../../components/ChatInterface";
 import ChatHistoryPanel from "../../components/ChatHistoryPanel";
 import Skeleton from "../../components/Skeleton";
 import ImageLightbox from "../../components/ImageLightbox";
-import appendNewToName from "../../utils/appendNewToName";
 import downloadPhoto from "../../utils/downloadPhoto";
 import DropDown from "../../components/DropDown";
 import { roomLabels, roomType, rooms, themeLabels, themeType, themes } from "../../utils/dropdownTypes";
@@ -27,6 +26,16 @@ const dancingScript = Dancing_Script({
   variable: "--font-dancing",
 });
 
+function sanitizeDownloadPart(value: string) {
+  return value.replace(/[\\/:*?"<>|]/g, "-").trim();
+}
+
+function resolveImageExtension(url: string | null, fallbackName?: string | null) {
+  const source = url || fallbackName || "";
+  const match = source.match(/\.([a-zA-Z0-9]+)(?:[?#].*)?$/);
+  return match ? `.${match[1].toLowerCase()}` : ".png";
+}
+
 export default function DreamPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"generate" | "chat">("generate");
@@ -36,6 +45,7 @@ export default function DreamPage() {
   const [restoredImage, setRestoredImage] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [restoredLoaded, setRestoredLoaded] = useState<boolean>(false);
+  const [loadingStage, setLoadingStage] = useState<string>("正在分析图片内容...");
   const [error, setError] = useState<string | null>(null);
   const [photoName, setPhotoName] = useState<string | null>(null);
   const [theme, setTheme] = useState<themeType>("Modern");
@@ -65,6 +75,25 @@ export default function DreamPage() {
     return () => window.clearTimeout(timer);
   }, [error]);
 
+  useEffect(() => {
+    if (!loading) return;
+
+    const stages = [
+      "正在分析图片内容...",
+      "正在生成效果图...",
+      "正在准备展示结果...",
+    ];
+    let index = 0;
+    setLoadingStage(stages[0]);
+
+    const timer = window.setInterval(() => {
+      index = (index + 1) % stages.length;
+      setLoadingStage(stages[index]);
+    }, 900);
+
+    return () => window.clearInterval(timer);
+  }, [loading]);
+
   // 开始新对话
   const handleNewChat = () => {
     const sessionId = createAndStoreSessionId();
@@ -76,6 +105,7 @@ export default function DreamPage() {
     setRestoredImage(null);
     setRestoredLoaded(false);
     setLoading(true);
+    setLoadingStage("正在分析图片内容...");
     setError(null);
     setPreviewImageUrl(null);
   };
@@ -433,7 +463,8 @@ export default function DreamPage() {
                           {restoredLoaded && restoredImage && (
                             <button
                               onClick={() => {
-                                downloadPhoto(restoredImage, appendNewToName(photoName || "generated-room.png"));
+                                const filename = `${sanitizeDownloadPart(themeLabels[theme])}-${sanitizeDownloadPart(roomLabels[room])}-new${resolveImageExtension(restoredImage, photoName)}`;
+                                downloadPhoto(restoredImage, filename);
                               }}
                               className="group relative rounded-xl border border-[#8B6F47]/30 bg-[#8B6F47] px-4 py-2 text-xs font-semibold tracking-wide text-white hover:bg-[#A68B5B] hover:border-[#A68B5B] hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all duration-300"
                             >
@@ -473,17 +504,39 @@ export default function DreamPage() {
                             <div className="absolute inset-0 p-3">
                               <div className="relative h-full w-full overflow-hidden rounded-2xl">
                                 <Skeleton variant="rounded" className="h-full w-full" />
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                  <div className="mb-3">
-                                    <div className="relative">
-                                      <div className="w-10 h-10 border-2 border-[#8B6F47]/20 border-t-[#8B6F47] rounded-full animate-spin">
-                                        <div className="absolute inset-2 flex items-center justify-center">
-                                          <div className="w-2 h-2 bg-[#8B6F47]/60 rounded-full" />
-                                        </div>
-                                      </div>
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/18 via-transparent to-[#8B6F47]/10" />
+                                <div className="absolute inset-0 flex items-center justify-center p-6">
+                                  <motion.div
+                                    initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    className="flex w-full max-w-sm flex-col items-center rounded-3xl border border-white/60 bg-white/78 px-6 py-7 text-center shadow-[0_20px_60px_rgba(139,111,71,0.18)] backdrop-blur-md"
+                                  >
+                                    <motion.div
+                                      animate={{ rotate: 360 }}
+                                      transition={{ repeat: Infinity, duration: 1.8, ease: "linear" }}
+                                      className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-[#8B6F47]/20 bg-[#F8F1E6]"
+                                    >
+                                      <svg className="h-7 w-7 text-[#8B6F47]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 12a8 8 0 018-8" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 12a8 8 0 01-8 8" opacity="0.35" />
+                                      </svg>
+                                    </motion.div>
+                                    <div className="text-base font-semibold text-[#2D2D2D]">
+                                      图片生成中
                                     </div>
-                                  </div>
-                                  <p className="text-xs text-[#9f8370]/60 tracking-wider uppercase">Generating...</p>
+                                    <motion.div
+                                      key={loadingStage}
+                                      initial={{ opacity: 0, y: 6 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, y: -6 }}
+                                      className="mt-2 text-sm text-[#6B6459]"
+                                    >
+                                      {loadingStage}
+                                    </motion.div>
+                                    <div className="mt-4">
+                                      <LoadingDots color="#A88A5A" style="large" />
+                                    </div>
+                                  </motion.div>
                                 </div>
                               </div>
                             </div>
