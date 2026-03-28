@@ -115,13 +115,13 @@ export default function AgentStatus({
   }
 
   return (
-    <div className="w-full bg-white/55 backdrop-blur-md rounded-2xl mb-4 border border-[#8B6F47]/20 shadow-lg">
+    <div className="w-full bg-surface-2 rounded-2xl mb-4 border border-secondary/15 shadow-sm">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[#2D2D2D] mb-3 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-accent mb-3 flex items-center gap-2">
           <span>🤖</span>
           <span>AI 智能体协作状态</span>
           {processingCount > 0 && (
-            <span className="ml-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-[#D4A652] to-[#8B6F47] text-white text-xs animate-pulse">
+            <span className="ml-2 px-2 py-0.5 rounded-full bg-accent/90 text-accent text-xs animate-pulse">
               {processingCount} 个处理中
             </span>
           )}
@@ -156,7 +156,7 @@ export default function AgentStatus({
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="flex items-center space-x-3 p-3 rounded-xl bg-white/70 hover:bg-white transition border border-[#8B6F47]/20"
+                  className="flex items-center space-x-3 p-3 rounded-lg bg-white/70 hover:bg-white transition border border-secondary/15"
                 >
                   {/* Agent 图标 */}
                   <div className="text-2xl w-10 h-10 flex items-center justify-center bg-gradient-to-br from-[#D4A652]/20 to-[#8B6F47]/20 rounded-lg">
@@ -214,7 +214,7 @@ export default function AgentStatus({
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-4 p-3 bg-gradient-to-r from-[#D4A652]/10 to-[#8B6F47]/10 border border-[#8B6F47]/30 rounded-xl"
+                className="mt-4 p-3 bg-accent/8 border border-accent/20 rounded-lg"
               >
                 <div className="flex items-center justify-center space-x-2">
                   <div className="w-2 h-2 bg-gradient-to-r from-[#D4A652] to-[#8B6F47] rounded-full animate-pulse" />

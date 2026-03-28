@@ -39,7 +39,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className="bg-[#17181C] text-white">
+      <body className="bg-primary text-text-primary">
         <ToastProvider>
           {children}
         </ToastProvider>

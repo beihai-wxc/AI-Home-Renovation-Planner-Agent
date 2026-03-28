@@ -113,12 +113,13 @@ export default function ChatHistoryPanel({
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-[#FAF8F5] to-[#F2ECE2] border-r border-[#8B6F47]/15">
-      <div className="p-3 border-b border-[#8B6F47]/15">
-        <h2 className="text-sm font-semibold text-[#2D2D2D] mb-2">历史记录</h2>
+    <div className="h-full flex flex-col bg-[#fcf9f8] border-r border-[#bdb3a5]/30">
+      <div className="p-4 border-b border-[#bdb3a5]/20">
+        <p className="text-[9px] font-light tracking-[0.25em] text-[#9f8370]/40 mb-2 uppercase">Chat History</p>
+        <h2 className="text-base font-semibold text-[#4e3c30] mb-3 font-display">历史记录</h2>
         <button
           onClick={() => onNewChat?.()}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#8B6F47] hover:bg-[#A68B5B] text-white rounded-lg transition text-sm font-medium"
+          className="w-full flex items-center justify-center gap-2 bg-[#4e3c30] text-white px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide hover:bg-[#3d2f26] transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 active:scale-95"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -127,16 +128,16 @@ export default function ChatHistoryPanel({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {actionError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-[11px] text-red-700">
+          <div className="rounded-lg border border-red-200 bg-red-50/85 px-2.5 py-2 text-[11px] text-red-700">
             {actionError}
           </div>
         )}
         {sessions.length === 0 ? (
           <div className="text-center py-8">
-            <div className="text-3xl mb-2 text-[#B1A99B]">📭</div>
-            <p className="text-xs text-[#6B6459]">暂无历史记录</p>
+            <div className="text-3xl mb-2 text-[#9f8370]">📭</div>
+            <p className="text-xs text-[#bdb3a5]">暂无历史记录</p>
           </div>
         ) : (
           sessions.map((session, index) => (
@@ -145,10 +146,10 @@ export default function ChatHistoryPanel({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className={`w-full px-2.5 py-2 rounded-xl text-left transition border ${
+              className={`w-full px-3 py-2.5 rounded-xl text-left transition border ${
                 session.session_id === currentSessionId
-                  ? "bg-white border-[#8B6F47]/40 shadow-sm"
-                  : "bg-white/70 hover:bg-white border-[#8B6F47]/10 hover:border-[#8B6F47]/30"
+                  ? "bg-white border-[#8B6F47]/30 shadow-soft"
+                  : "bg-white/60 hover:bg-white border-[#bdb3a5]/20 hover:border-[#bdb3a5]/40"
               }`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -156,14 +157,14 @@ export default function ChatHistoryPanel({
                   onClick={() => onSelectSession(session.session_id)}
                   className="min-w-0 flex-1 text-left"
                 >
-                  <p className="text-[14px] font-semibold text-[#2D2D2D] leading-5 line-clamp-1">
+                  <p className="text-[14px] font-semibold text-[#4e3c30] leading-5 line-clamp-1 font-display">
                     {session.pinned ? "📌 " : ""}
                     {getSessionTitle(session)}
                   </p>
-                  <p className="mt-0.5 text-[12px] leading-4 text-[#6B6459] line-clamp-1">
+                  <p className="mt-0.5 text-[12px] leading-4 text-[#9f8370] line-clamp-1">
                     {getSessionSummary(session)}
                   </p>
-                  <span className="mt-1.5 inline-block text-[11px] text-[#8A8A8A]">
+                  <span className="mt-1.5 inline-block text-[11px] text-[#bdb3a5]">
                     {formatDate(session.updated_at)}
                   </span>
                 </button>
@@ -176,7 +177,7 @@ export default function ChatHistoryPanel({
                         prev === session.session_id ? null : session.session_id
                       )
                     }
-                    className="h-7 w-7 rounded-md hover:bg-[#F4ECE3] text-[#8B6F47] inline-flex items-center justify-center"
+                    className="h-7 w-7 rounded-md hover:bg-[#f2ebe7] text-[#4e3c30]/60 hover:text-[#4e3c30] inline-flex items-center justify-center transition-colors duration-200"
                     title="更多操作"
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
@@ -187,18 +188,18 @@ export default function ChatHistoryPanel({
                   </button>
 
                   {activeMenuSessionId === session.session_id && (
-                    <div className="absolute right-0 z-20 mt-1 w-28 rounded-lg border border-[#8B6F47]/15 bg-white shadow-lg">
+                    <div className="absolute right-0 z-20 mt-1 w-28 rounded-lg border border-[#bdb3a5]/15 bg-white shadow-lg overflow-hidden">
                       <button
                         type="button"
                         onClick={() => handleTogglePinned(session)}
-                        className="w-full px-3 py-2 text-left text-xs text-[#2D2D2D] hover:bg-[#F7F1E7] rounded-t-lg"
+                        className="w-full px-3 py-2 text-left text-xs text-[#4e3c30] hover:bg-[#f2ebe7] rounded-t-lg transition-colors duration-200"
                       >
                         {session.pinned ? "取消置顶" : "置顶"}
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteSession(session)}
-                        className="w-full px-3 py-2 text-left text-xs text-red-700 hover:bg-red-50 rounded-b-lg"
+                        className="w-full px-3 py-2 text-left text-xs text-red-700 hover:bg-red-50 rounded-b-lg transition-colors duration-200"
                       >
                         删除
                       </button>
@@ -213,26 +214,26 @@ export default function ChatHistoryPanel({
 
       {pendingDeleteSession && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[#8B6F47]/20 bg-white p-4 shadow-xl">
-            <h3 className="text-sm font-semibold text-[#2D2D2D]">确认删除</h3>
-            <p className="mt-2 text-xs leading-5 text-[#6B6459]">
+          <div className="w-full max-w-sm rounded-2xl border border-[#bdb3a5]/20 bg-white p-5 shadow-xl">
+            <h3 className="text-sm font-semibold text-[#4e3c30] font-display">确认删除</h3>
+            <p className="mt-2 text-xs leading-5 text-[#9f8370]">
               确认删除这条历史对话吗？删除后不可恢复。
             </p>
-            <p className="mt-1 text-xs text-[#8A8A8A] line-clamp-1">
+            <p className="mt-1 text-xs text-[#bdb3a5] line-clamp-1">
               {getSessionTitle(pendingDeleteSession)}
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setPendingDeleteSession(null)}
-                className="rounded-lg border border-[#8B6F47]/20 px-3 py-1.5 text-xs text-[#6B6459] hover:bg-[#F7F1E7]"
+                className="rounded-lg border border-[#bdb3a5]/30 px-3 py-1.5 text-xs text-[#9f8370] hover:bg-[#f2ebe7] transition-colors duration-200"
               >
                 取消
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700"
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700 transition-colors duration-200"
               >
                 删除
               </button>

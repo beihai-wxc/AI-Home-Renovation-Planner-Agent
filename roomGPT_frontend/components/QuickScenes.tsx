@@ -27,10 +27,10 @@ const styles = [
 
 export default function QuickScenes({ onSelect }: QuickScenesProps) {
   return (
-    <div className="mb-3 space-y-2.5">
+    <div className="mb-3 space-y-3">
       <div>
-        <p className="text-xs text-[#8A8A8A] mb-2">房间类型</p>
-        <div className="flex flex-wrap gap-1.5">
+        <p className="text-xs text-text-tertiary mb-2 font-medium">房间类型</p>
+        <div className="flex flex-wrap gap-2">
           {scenes.map((scene, index) => (
             <motion.button
               key={scene.id}
@@ -38,7 +38,7 @@ export default function QuickScenes({ onSelect }: QuickScenesProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
               onClick={() => onSelect?.(scene.name)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/70 hover:bg-white border border-[#8B6F47]/20 transition text-xs text-[#5A5A5A] hover:text-[#2D2D2D]"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/70 hover:bg-white border border-secondary/20 transition text-xs text-text-secondary hover:text-accent font-body"
             >
               <span className="text-base">{scene.icon}</span>
               <span>{scene.name}</span>
@@ -48,8 +48,8 @@ export default function QuickScenes({ onSelect }: QuickScenesProps) {
       </div>
 
       <div>
-        <p className="text-xs text-[#8A8A8A] mb-2">装修风格</p>
-        <div className="flex flex-wrap gap-1.5">
+        <p className="text-xs text-text-tertiary mb-2 font-medium">装修风格</p>
+        <div className="flex flex-wrap gap-2">
           {styles.map((style, index) => (
             <motion.button
               key={style.id}
@@ -57,7 +57,7 @@ export default function QuickScenes({ onSelect }: QuickScenesProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 + index * 0.05 }}
               onClick={() => onSelect?.("", style.name)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/70 hover:bg-white border border-[#8B6F47]/20 transition text-xs text-[#5A5A5A] hover:text-[#2D2D2D]"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/70 hover:bg-white border border-secondary/20 transition text-xs text-text-secondary hover:text-accent font-body"
             >
               <span className="text-base">{style.icon}</span>
               <span>{style.name}</span>

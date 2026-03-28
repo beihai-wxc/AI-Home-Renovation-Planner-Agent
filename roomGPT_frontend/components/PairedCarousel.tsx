@@ -34,16 +34,16 @@ function SlidePanel({
 }) {
   return (
     <div>
-      <h3 className="mb-3 text-center text-xl font-semibold text-[#2D2D2D] sm:text-4xl">{title}</h3>
+      <h3 className="mb-3 text-center text-xl font-semibold text-accent sm:text-4xl">{title}</h3>
       <div
-        className="image-card group relative w-full cursor-zoom-in overflow-hidden rounded-3xl border border-[#8B6F47]/20 bg-white/50 backdrop-blur-sm shadow-[0_8px_32px_rgba(139,111,71,0.08)] transition duration-500 hover:border-[#8B6F47]/40"
+        className="image-card group relative w-full cursor-zoom-in overflow-hidden rounded-2xl border border-secondary/15 bg-surface-2 shadow-sm transition duration-300 hover:border-secondary/30"
         onClick={() => onPreview(imageSrc, imageAlt)}
       >
         {/* 标签角标 */}
-        <div className={`absolute top-4 left-4 z-10 px-3 py-1.5 rounded-full text-sm font-medium ${
+        <div className={`absolute top-4 left-4 z-10 px-3 py-1.5 rounded-md text-sm font-medium ${
           labelType === "before"
-            ? "bg-gray-500/80 text-white backdrop-blur-sm"
-            : "bg-gradient-to-r from-[#7A9E7E] to-[#5B8A72] text-white"
+            ? "bg-text-secondary text-white"
+            : "bg-accent text-white"
         }`}>
           {label}
         </div>
@@ -67,7 +67,7 @@ function SlidePanel({
             </motion.div>
           </AnimatePresence>
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#FAF8F5]/80 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-surface-2 to-transparent" />
       </div>
     </div>
   );
@@ -117,7 +117,7 @@ export default function PairedCarousel({ pairs, interval = 3500 }: PairedCarouse
 
       {/* 进度指示器 */}
       <div className="mt-6 flex items-center justify-center gap-4">
-        <span className="text-sm text-[#6B6459] font-medium">
+        <span className="text-sm text-text-secondary font-medium">
           {activeIndex + 1} / {pairs.length}
         </span>
         <div className="flex justify-center gap-2">
@@ -127,8 +127,8 @@ export default function PairedCarousel({ pairs, interval = 3500 }: PairedCarouse
               type="button"
               aria-label={`切换到第 ${index + 1} 组对比图`}
               onClick={() => setActiveIndex(index)}
-              className={`h-2.5 rounded-full transition-all duration-300 ${
-                index === activeIndex ? "w-7 bg-[#8B6F47]" : "w-2.5 bg-[#C9B896]/50"
+              className={`h-2.5 rounded-md transition-all duration-200 ${
+                index === activeIndex ? "w-7 bg-accent" : "w-2.5 bg-secondary/30"
               }`}
             />
           ))}
