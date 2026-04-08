@@ -15,7 +15,7 @@ export type roomType =
 
 export const themeLabels: Record<themeType, string> = {
   Modern: "现代风",
-  Minimalist: "简约风",
+  Minimalist: "极简风",
   Professional: "商务风",
   Tropical: "热带风",
   Vintage: "复古风",

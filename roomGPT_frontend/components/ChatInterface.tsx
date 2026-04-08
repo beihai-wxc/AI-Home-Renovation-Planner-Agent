@@ -637,7 +637,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
               className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"} mb-2`}
             >
               <div
-                className={`group max-w-[70%] ${
+                className={`group min-w-0 max-w-[70%] ${
                   message.role === "user"
                     ? "message-user"
                     : "message-assistant"

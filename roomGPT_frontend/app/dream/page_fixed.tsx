@@ -131,7 +131,7 @@ export default function DreamPage() {
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     try {
-      const mapped = await mapLocalRenderImage(file?.name ?? null, themeLabels[theme]);
+      const mapped = await mapLocalRenderImage(file?.name ?? null, themeLabels[theme], roomLabels[room]);
       if (!mapped.imageUrl) {
         setRestoredImage(null);
         console.warn("local render mapping not found", mapped.message || "no mapping");

@@ -507,6 +507,29 @@ def find_existing_file_by_name(directory: Path, filename: str) -> Optional[Path]
     return None
 
 
+def find_matching_file_by_stems(directory: Path, stems: list[str]) -> Optional[Path]:
+    if not directory.exists():
+        return None
+
+    normalized_stems = [stem.strip() for stem in stems if stem and stem.strip()]
+    if not normalized_stems:
+        return None
+
+    for stem in normalized_stems:
+        matched = find_existing_file_by_stem(directory, stem)
+        if matched:
+            return matched
+
+    lowered_stems = [stem.lower() for stem in normalized_stems]
+    for candidate in directory.iterdir():
+        if not candidate.is_file():
+            continue
+        candidate_stem = candidate.stem.lower()
+        if any(candidate_stem.startswith(stem) for stem in lowered_stems):
+            return candidate
+    return None
+
+
 def resolve_local_image_dirs() -> tuple[Path, Path]:
     original_dir = LOCAL_ORIGINAL_DIR
     rendered_dir = LOCAL_RENDERED_DIR
@@ -543,15 +566,103 @@ def resolve_local_image_dirs() -> tuple[Path, Path]:
     return original_fallback or original_dir, rendered_fallback or rendered_dir
 
 
+def get_local_library_roots() -> list[Path]:
+    roots: list[Path] = []
+    for root in [Path(os.getcwd()), FRONTEND_PUBLIC_ROOT]:
+        resolved = root.resolve()
+        if resolved not in roots:
+            roots.append(resolved)
+    return roots
+
+
+def relative_local_library_path(file_path: Path) -> Optional[str]:
+    resolved = file_path.resolve()
+    for root in get_local_library_roots():
+        try:
+            return resolved.relative_to(root).as_posix()
+        except ValueError:
+            continue
+    return None
+
+
+def normalize_style_label(style: str) -> str:
+    aliases = {
+        "简约风": "极简风",
+        "极简风": "极简风",
+        "modern": "现代风",
+        "现代风": "现代风",
+        "现代北欧风": "现代北欧风",
+        "vintage": "复古风",
+        "复古风": "复古风",
+        "professional": "商务风",
+        "商务风": "商务风",
+        "tropical": "热带风",
+        "热带风": "热带风",
+    }
+    key = (style or "").strip()
+    return aliases.get(key.lower(), aliases.get(key, key))
+
+
+def normalize_room_label(room: str) -> str:
+    aliases = {
+        "living room": "客厅",
+        "客厅": "客厅",
+        "bedroom": "卧室",
+        "卧室": "卧室",
+        "房间": "卧室",
+    }
+    key = (room or "").strip()
+    return aliases.get(key.lower(), aliases.get(key, key))
+
+
+def resolve_room_library_dir(room: str) -> Optional[Path]:
+    normalized_room = normalize_room_label(room)
+    if not normalized_room:
+        return None
+
+    for root in get_local_library_roots():
+        try:
+            for candidate in root.iterdir():
+                if (
+                    candidate.is_dir()
+                    and candidate.name.startswith("一转五风格_")
+                    and normalized_room in candidate.name
+                ):
+                    return candidate
+        except FileNotFoundError:
+            continue
+    return None
+
+
+def extract_render_index_from_filename(filename: str) -> Optional[str]:
+    stem = Path(filename or "").stem.strip()
+    if not stem:
+        return None
+
+    b_match = re.search(r"(?i)B(\d+)", stem)
+    if b_match:
+        return b_match.group(1)
+
+    trailing_digit_match = re.search(r"(\d)$", stem)
+    if trailing_digit_match:
+        return trailing_digit_match.group(1)
+
+    return None
+
+
 def resolve_local_render_mapping(
     *,
     original_filename: Optional[str],
     style: Optional[str],
+    room: Optional[str] = None,
 ) -> dict[str, Optional[str]]:
     style = (style or "").strip()
     original_filename = (original_filename or "").strip()
+    normalized_style = normalize_style_label(style)
+    normalized_room = normalize_room_label(room or "")
     default_style_map = {
         "简约风": "简约风",
+        "极简风": "简约风",
         "现代北欧风": "现代北欧风",
         "现代风": "现代北欧风",
     }
@@ -560,27 +671,60 @@ def resolve_local_render_mapping(
 
     if original_filename:
         stem = Path(original_filename).stem
-        match = re.search(r"(?i)B(\d+)", stem)
-        if not match:
-            return {"image_url": None, "message": "文件名无法识别，请按 B1/B2 这类命名上传原图。"}
-        mapped_stem = f"A{match.group(1)}"
-        rendered = find_existing_file_by_stem(rendered_dir, mapped_stem)
-        original = find_existing_file_by_stem(original_dir, f"B{match.group(1)}")
-        if not rendered:
-            return {"image_url": None, "message": f"未找到与 {stem} 对应的渲染图（期望 {mapped_stem}）。"}
-        return {
-            "image_filename": rendered.name,
-            "original_filename": original.name if original else None,
-            "message": None,
-        }
+        render_index = extract_render_index_from_filename(original_filename)
+        if render_index:
+            mapped_stem = f"A{render_index}"
+            rendered = find_existing_file_by_stem(rendered_dir, mapped_stem)
+            original = find_existing_file_by_name(original_dir, Path(original_filename).name)
+            if not original:
+                original = find_matching_file_by_stems(original_dir, [stem, f"B{render_index}"])
+            if not rendered:
+                return {"image_url": None, "message": f"未找到与 {stem} 对应的渲染图（期望 {mapped_stem}）。"}
+            return {
+                "image_filename": rendered.name,
+                "image_kind": "rendered",
+                "original_filename": original.name if original else None,
+                "original_kind": "original" if original else None,
+                "message": None,
+            }
 
-    style_key = default_style_map.get(style)
+    if normalized_room:
+        room_dir = resolve_room_library_dir(normalized_room)
+        if room_dir:
+            rendered = find_matching_file_by_stems(room_dir, [normalized_style, style])
+            original = find_matching_file_by_stems(
+                room_dir,
+                [normalized_room, "原图", "原图1"],
+            )
+            if rendered:
+                return {
+                    "image_filename": rendered.name,
+                    "image_kind": "library",
+                    "image_path": relative_local_library_path(rendered),
+                    "original_filename": original.name if original else None,
+                    "original_kind": "library" if original else None,
+                    "original_path": relative_local_library_path(original) if original else None,
+                    "message": None,
+                }
+
+    style_key = default_style_map.get(normalized_style) or default_style_map.get(style)
     if not style_key:
+        if normalized_room:
+            return {
+                "image_url": None,
+                "message": "图片生成失败",
+            }
         return {"image_url": None, "message": "当前无图直生仅支持简约风、现代北欧风。"}
     rendered = find_existing_file_by_stem(rendered_dir, style_key)
     if not rendered:
         return {"image_url": None, "message": f"未找到风格示例图：{style_key}。"}
-    return {"image_filename": rendered.name, "original_filename": None, "message": None}
+    return {
+        "image_filename": rendered.name,
+        "image_kind": "rendered",
+        "original_filename": None,
+        "original_kind": None,
+        "message": None,
+    }
 
 
 def extract_style_from_message(message: str) -> str:
@@ -1124,17 +1268,26 @@ async def local_render_map_endpoint(
     request: Request,
     original_filename: str = Form(""),
     style: str = Form(""),
+    room: str = Form(""),
 ):
-    mapping = resolve_local_render_mapping(original_filename=original_filename, style=style)
+    mapping = resolve_local_render_mapping(original_filename=original_filename, style=style, room=room)
     image_filename = mapping.get("image_filename")
+    image_kind = mapping.get("image_kind") or "rendered"
+    image_path = mapping.get("image_path")
     original_filename_mapped = mapping.get("original_filename")
+    original_kind = mapping.get("original_kind") or "original"
+    original_path = mapping.get("original_path")
     image_url = (
-        str(request.url_for("local_file_asset", kind="rendered", filename=quote(image_filename)))
+        str(request.url_for("local_library_asset", library_path=quote(image_path)))
+        if image_kind == "library" and image_path
+        else str(request.url_for("local_file_asset", kind="rendered", filename=quote(image_filename)))
         if image_filename
         else None
     )
     original_url = (
-        str(request.url_for("local_file_asset", kind="original", filename=quote(original_filename_mapped)))
+        str(request.url_for("local_library_asset", library_path=quote(original_path)))
+        if original_kind == "library" and original_path
+        else str(request.url_for("local_file_asset", kind="original", filename=quote(original_filename_mapped)))
         if original_filename_mapped
         else None
     )
@@ -1156,6 +1309,35 @@ async def local_file_asset(kind: str, filename: str):
     file_path = find_existing_file_by_name(directory, safe_name)
     if not file_path:
         raise HTTPException(status_code=404, detail="Local file not found.")
+    suffix = file_path.suffix.lower()
+    media_type = "image/png"
+    if suffix in {".jpg", ".jpeg"}:
+        media_type = "image/jpeg"
+    elif suffix == ".webp":
+        media_type = "image/webp"
+    return FileResponse(str(file_path), media_type=media_type)
+
+
+@app.get("/api/local-library-files/{library_path:path}", name="local_library_asset")
+async def local_library_asset(library_path: str):
+    requested_path = Path(library_path)
+    if requested_path.is_absolute() or ".." in requested_path.parts:
+        raise HTTPException(status_code=404, detail="Invalid local library path.")
+
+    file_path: Optional[Path] = None
+    for root in get_local_library_roots():
+        candidate = (root / requested_path).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            continue
+        if candidate.exists() and candidate.is_file():
+            file_path = candidate
+            break
+
+    if not file_path:
+        raise HTTPException(status_code=404, detail="Local library file not found.")
+
     suffix = file_path.suffix.lower()
     media_type = "image/png"
     if suffix in {".jpg", ".jpeg"}:

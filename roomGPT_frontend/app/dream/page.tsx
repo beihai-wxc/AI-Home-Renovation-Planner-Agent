@@ -50,9 +50,11 @@ export default function DreamPage() {
   const [photoName, setPhotoName] = useState<string | null>(null);
   const [theme, setTheme] = useState<themeType>("Modern");
   const [room, setRoom] = useState<roomType>("Living Room");
+  const [selectionDirty, setSelectionDirty] = useState<boolean>(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string>("图片预览");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const generationRequestIdRef = useRef(0);
 
   // 从 localStorage 恢复侧栏状态
   useEffect(() => {
@@ -107,6 +109,20 @@ export default function DreamPage() {
     setLoading(true);
     setLoadingStage("正在分析图片内容...");
     setError(null);
+    setSelectionDirty(false);
+    setPreviewImageUrl(null);
+  };
+
+  const markSelectionsChanged = () => {
+    setError(null);
+    if (!originalPhoto && !restoredImage && !loading) return;
+    generationRequestIdRef.current += 1;
+    setSelectionDirty(true);
+    setOriginalPhoto(null);
+    setPhotoName(null);
+    setRestoredImage(null);
+    setRestoredLoaded(false);
+    setLoading(false);
     setPreviewImageUrl(null);
   };
 
@@ -116,8 +132,9 @@ export default function DreamPage() {
       setPhotoName(file.name);
       const url = URL.createObjectURL(file);
       setOriginalPhoto(url);
-      generatePhotoFromLocal(file);
+      void generatePhotoFromLocal(file);
     }
+    e.target.value = "";
   };
 
   const UploadDropZone = () => (
@@ -160,29 +177,39 @@ export default function DreamPage() {
   );
 
   const generatePhotoFromLocal = async (file: File | null = null) => {
+    const requestId = generationRequestIdRef.current + 1;
+    generationRequestIdRef.current = requestId;
     beginGenerationTransition();
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     try {
-      const mapped = await mapLocalRenderImage(file?.name ?? null, themeLabels[theme]);
+      const mapped = await mapLocalRenderImage(file?.name ?? null, themeLabels[theme], roomLabels[room]);
+      if (generationRequestIdRef.current !== requestId) {
+        return;
+      }
       if (!mapped.imageUrl) {
         setRestoredImage(null);
-        // 本地匹配失败时静默处理，不向前端展示错误提示。
-        console.warn("local render mapping not found", mapped.message || "no mapping");
+        setError(mapped.message || "图片生成失败");
         return;
       }
       if (!file && mapped.originalImageUrl) {
         setOriginalPhoto(mapped.originalImageUrl);
       }
       if (!file) {
-        setPhotoName(`${themeLabels[theme]}.png`);
+        setPhotoName(`${roomLabels[room]}-${themeLabels[theme]}.png`);
       }
+      setSelectionDirty(false);
       setRestoredImage(mapped.imageUrl);
     } catch (err) {
-      // 本地映射异常时静默处理，避免在界面显示匹配失败信息。
+      if (generationRequestIdRef.current !== requestId) {
+        return;
+      }
       console.warn("local render mapping failed", err);
+      setError("读取本地图像库失败，请检查素材目录或稍后重试。");
     } finally {
-      setLoading(false);
+      if (generationRequestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
   };
 
@@ -400,7 +427,10 @@ export default function DreamPage() {
                           </div>
                           <DropDown
                             theme={theme}
-                            setTheme={(newTheme) => setTheme(newTheme as typeof theme)}
+                            setTheme={(newTheme) => {
+                              setTheme(newTheme as typeof theme);
+                              markSelectionsChanged();
+                            }}
                             themes={themes}
                           />
                         </div>
@@ -421,7 +451,10 @@ export default function DreamPage() {
                           </div>
                           <DropDown
                             theme={room}
-                            setTheme={(newRoom) => setRoom(newRoom as typeof room)}
+                            setTheme={(newRoom) => {
+                              setRoom(newRoom as typeof room);
+                              markSelectionsChanged();
+                            }}
                             themes={rooms}
                           />
                         </div>
@@ -436,14 +469,19 @@ export default function DreamPage() {
                               {originalPhoto && <div className="absolute -inset-1 rounded-lg bg-[rgba(140,106,65,0.15)]" />}
                             </div>
                             <div>
-                              <p className="text-left font-medium text-accent">上传一张您的房间照片</p>
-                              <p className="text-[10px] font-normal tracking-wider text-text-secondary/80 mt-0.5 uppercase">Upload Photo</p>
+                              <p className="text-left font-medium text-accent">上传一张您的房间照片（可选）</p>
+                              <p className="text-[10px] font-normal tracking-wider text-text-secondary/80 mt-0.5 uppercase">Optional Photo Upload</p>
                             </div>
                           </div>
                         </div>
                         <div className="mt-4">
                           <UploadDropZone />
                         </div>
+                        {selectionDirty && (
+                          <div className="mt-4 rounded-xl border border-[rgba(175,135,80,0.28)] bg-[rgba(255,248,237,0.92)] px-4 py-3 text-sm text-[#7a5c39]">
+                            已修改房间或风格，请重新上传图片以生成新结果。
+                          </div>
+                        )}
                         {error && (
                           <div
                             className="bg-red-500/15 border border-red-400/40 text-red-700 px-4 py-3 rounded-xl mt-6"
@@ -496,7 +534,7 @@ export default function DreamPage() {
                                 </svg>
                               </div>
                               <p className="text-sm font-medium text-accent">生成结果将显示在这里</p>
-                              <p className="text-xs text-text-secondary/85 mt-2">完成上方步骤后开始生成</p>
+                              <p className="text-xs text-text-secondary/85 mt-2">先选择房间和风格，再上传图片开始生成</p>
                             </div>
                           )}
 

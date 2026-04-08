@@ -103,7 +103,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     if (!paragraphBuffer.length) return;
     const text = paragraphBuffer.join(" ");
     elements.push(
-      <p key={`p-${elements.length}`} className="mb-3 leading-7">
+      <p key={`p-${elements.length}`} className="mb-3 break-words [overflow-wrap:anywhere] leading-7">
         {renderInline(text)}
       </p>
     );
@@ -116,10 +116,12 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     elements.push(
       <Tag
         key={`list-${elements.length}`}
-        className={`mb-3 pl-5 leading-7 ${Tag === "ul" ? "list-disc" : "list-decimal"}`}
+        className={`mb-3 pl-5 break-words [overflow-wrap:anywhere] leading-7 ${Tag === "ul" ? "list-disc" : "list-decimal"}`}
       >
         {listBuffer.items.map((item, index) => (
-          <li key={`${Tag}-${index}`}>{renderInline(item)}</li>
+          <li key={`${Tag}-${index}`} className="break-words [overflow-wrap:anywhere]">
+            {renderInline(item)}
+          </li>
         ))}
       </Tag>
     );
@@ -242,7 +244,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
       elements.push(
         <blockquote
           key={`quote-${elements.length}`}
-          className="mb-3 border-l-4 border-[#C8B28B] bg-[#FAF6EF] px-4 py-2 italic text-[#6B6459]"
+          className="mb-3 break-words [overflow-wrap:anywhere] border-l-4 border-[#C8B28B] bg-[#FAF6EF] px-4 py-2 italic text-[#6B6459]"
         >
           {renderInline(quoteMatch[1])}
         </blockquote>
@@ -275,6 +277,6 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     flushCode();
   }
 
-  return <div className="markdown-content text-sm sm:text-base">{elements}</div>;
+  return <div className="markdown-content min-w-0 text-sm [overflow-wrap:anywhere] sm:text-base">{elements}</div>;
 }
 

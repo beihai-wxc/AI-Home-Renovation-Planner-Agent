@@ -401,11 +401,13 @@ export async function fetchRecommendedPrompts(limit = 6): Promise<string[]> {
 
 export async function mapLocalRenderImage(
   originalFilename: string | null,
-  style: string
+  style: string,
+  room: string
 ): Promise<{ imageUrl?: string; originalImageUrl?: string; message?: string; mode: string }> {
   const formData = new FormData();
   formData.append("original_filename", originalFilename || "");
   formData.append("style", style);
+  formData.append("room", room);
 
   const response = await fetch(`${API_BASE_URL}/api/local-render-map`, {
     method: "POST",
