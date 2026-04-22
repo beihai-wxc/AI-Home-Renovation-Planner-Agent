@@ -639,3 +639,28 @@ def get_latest_3d_job_for_session(
             return dict(row) if row else None
         finally:
             conn.close()
+
+
+def get_latest_3d_job_for_source_image(
+    session_id: str,
+    user_id: str,
+    source_image: str,
+) -> Optional[dict[str, Any]]:
+    with _LOCK:
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                """
+                SELECT job_id, session_id, user_id, status, source_image,
+                       external_task_id, result_filename, error_message,
+                       progress, created_at, updated_at
+                FROM three_d_jobs
+                WHERE session_id = ? AND user_id = ? AND source_image = ?
+                ORDER BY created_at DESC, job_id DESC
+                LIMIT 1
+                """,
+                (session_id, user_id, source_image),
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()

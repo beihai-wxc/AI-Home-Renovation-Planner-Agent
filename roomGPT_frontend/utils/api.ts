@@ -82,6 +82,10 @@ function buildChatMessage(data: {
   role: "user" | "assistant";
   content: string;
   imageUrl?: string | null;
+  modelUrl?: string | null;
+  threeDJobId?: string | null;
+  threeDStatus?: "pending" | "processing" | "completed" | "failed" | null;
+  threeDProgress?: number | null;
   references?: Array<{
     title: string;
     url: string;
@@ -101,6 +105,10 @@ function buildChatMessage(data: {
     role: data.role,
     content: data.content,
     imageUrl: data.imageUrl || undefined,
+    modelUrl: data.modelUrl || undefined,
+    threeDJobId: data.threeDJobId || undefined,
+    threeDStatus: data.threeDStatus || undefined,
+    threeDProgress: data.threeDProgress ?? undefined,
     references: data.references || undefined,
     attachments: data.attachments || undefined,
     timestamp: data.created_at ? new Date(data.created_at) : new Date(),
@@ -211,6 +219,10 @@ export async function fetchSessionMessages(sessionId: string): Promise<ChatMessa
       role: message.role,
       content: message.content,
       imageUrl: message.imageUrl,
+      modelUrl: message.modelUrl,
+      threeDJobId: message.threeDJobId,
+      threeDStatus: message.threeDStatus,
+      threeDProgress: message.threeDProgress,
       references: message.references,
       attachments: message.attachments,
       created_at: message.created_at,

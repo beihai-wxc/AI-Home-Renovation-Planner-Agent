@@ -45,6 +45,11 @@ export default function ModelViewer({ modelUrl, posterUrl, className }: ModelVie
   const [scriptReady, setScriptReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    setLoaded(false);
+    setError(false);
+  }, [modelUrl]);
+
   // Dynamically load model-viewer script (self-hosted via npm)
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -145,23 +150,25 @@ export default function ModelViewer({ modelUrl, posterUrl, className }: ModelVie
           }}
         >
           {/* Custom progress bar slot */}
-          <div
-            slot="progress-bar"
-            style={{
-              position: "absolute",
-              bottom: "12px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              backgroundColor: "rgba(138, 107, 70, 0.85)",
-              color: "#fff",
-              padding: "6px 16px",
-              borderRadius: "999px",
-              fontSize: "12px",
-              fontWeight: 600,
-            }}
-          >
-            模型加载中…
-          </div>
+          {!loaded && (
+            <div
+              slot="progress-bar"
+              style={{
+                position: "absolute",
+                bottom: "12px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                backgroundColor: "rgba(138, 107, 70, 0.85)",
+                color: "#fff",
+                padding: "6px 16px",
+                borderRadius: "999px",
+                fontSize: "12px",
+                fontWeight: 600,
+              }}
+            >
+              模型加载中…
+            </div>
+          )}
         </model-viewer>
       )}
 

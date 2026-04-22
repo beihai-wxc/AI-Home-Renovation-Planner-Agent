@@ -134,9 +134,19 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
   }, []);
 
   useEffect(() => {
+    setPending3DJobId(null);
     fetchSessionMessages(sessionId)
-      .then(setMessages)
-      .catch(() => setMessages([]));
+      .then((history) => {
+        setMessages(history);
+        const active3DJob = [...history]
+          .reverse()
+          .find((message) => message.threeDJobId && message.threeDStatus && message.threeDStatus !== "completed" && message.threeDStatus !== "failed");
+        setPending3DJobId(active3DJob?.threeDJobId || null);
+      })
+      .catch(() => {
+        setMessages([]);
+        setPending3DJobId(null);
+      });
     fetchRecommendedPrompts(6)
       .then(setRecommendedPrompts)
       .catch(() => setRecommendedPrompts([]));

@@ -28,6 +28,7 @@ from db import (
     ensure_session,
     get_render_job,
     get_3d_job,
+    get_latest_3d_job_for_source_image,
     get_messages,
     init_db,
     list_sessions,
@@ -147,6 +148,10 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     imageUrl: Optional[str] = None
+    modelUrl: Optional[str] = None
+    threeDJobId: Optional[str] = None
+    threeDStatus: Optional[str] = None
+    threeDProgress: Optional[int] = None
     attachments: Optional[list[dict[str, str]]] = None
     references: Optional[list[dict[str, str]]] = None
     created_at: str
@@ -1231,30 +1236,47 @@ async def delete_session_endpoint(session_id: str, user_id: str = DEFAULT_USER):
 @app.get("/api/sessions/{session_id}/messages", response_model=list[MessageResponse])
 async def get_session_messages(request: Request, session_id: str, user_id: str = DEFAULT_USER):
     messages = get_messages(session_id=session_id, user_id=user_id)
-    return [
-        MessageResponse(
-            id=str(message["id"]),
-            role=message["role"],
-            content=message["content"],
-            imageUrl=build_asset_url(request, session_id, message["image_filename"], user_id)
-            if message["image_filename"]
-            else None,
-            attachments=[
-                {
-                    "id": f"{message['id']}-{idx}",
-                    "url": build_asset_url(request, session_id, item["filename"], user_id),
-                    "label": item.get("label")
-                    or ("原图" if item.get("asset_type") == "current_room" else "灵感图" if item.get("asset_type") == "inspiration" else "图片"),
-                    "kind": item.get("asset_type") or "general",
-                }
-                for idx, item in enumerate(message.get("attachments") or [])
-            ]
-            or None,
-            references=message.get("references") or [],
-            created_at=message["created_at"],
+    results: list[MessageResponse] = []
+    for message in messages:
+        image_filename = message.get("image_filename")
+        three_d_job = (
+            get_latest_3d_job_for_source_image(session_id, user_id, image_filename)
+            if image_filename
+            else None
         )
-        for message in messages
-    ]
+        model_url = (
+            build_asset_url(request, session_id, three_d_job["result_filename"], user_id)
+            if three_d_job and three_d_job.get("result_filename")
+            else None
+        )
+        results.append(
+            MessageResponse(
+                id=str(message["id"]),
+                role=message["role"],
+                content=message["content"],
+                imageUrl=build_asset_url(request, session_id, image_filename, user_id)
+                if image_filename
+                else None,
+                modelUrl=model_url,
+                threeDJobId=three_d_job["job_id"] if three_d_job else None,
+                threeDStatus=three_d_job.get("status") if three_d_job else None,
+                threeDProgress=three_d_job.get("progress") if three_d_job else None,
+                attachments=[
+                    {
+                        "id": f"{message['id']}-{idx}",
+                        "url": build_asset_url(request, session_id, item["filename"], user_id),
+                        "label": item.get("label")
+                        or ("原图" if item.get("asset_type") == "current_room" else "灵感图" if item.get("asset_type") == "inspiration" else "图片"),
+                        "kind": item.get("asset_type") or "general",
+                    }
+                    for idx, item in enumerate(message.get("attachments") or [])
+                ]
+                or None,
+                references=message.get("references") or [],
+                created_at=message["created_at"],
+            )
+        )
+    return results
 
 
 @app.get("/api/render-jobs/{job_id}", response_model=RenderJobResponse)
