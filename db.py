@@ -96,6 +96,24 @@ def init_db() -> None:
 
                 CREATE INDEX IF NOT EXISTS idx_message_assets_message
                 ON message_assets(message_id, created_at);
+
+                CREATE TABLE IF NOT EXISTS three_d_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    source_image TEXT,
+                    external_task_id TEXT,
+                    result_filename TEXT,
+                    error_message TEXT,
+                    progress INTEGER DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY(session_id) REFERENCES sessions(session_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_three_d_jobs_session
+                ON three_d_jobs(session_id, created_at);
                 """
             )
             columns = conn.execute("PRAGMA table_info(sessions)").fetchall()
@@ -509,3 +527,115 @@ def session_state_snapshot(session_id: str, user_id: str) -> dict[str, Any]:
         if metadata.get("asset_name"):
             state["current_asset_name"] = metadata["asset_name"]
     return state
+
+
+def create_3d_job(
+    *,
+    job_id: str,
+    session_id: str,
+    user_id: str,
+    source_image: str,
+    external_task_id: str = "",
+    status: str = "pending",
+) -> None:
+    ensure_session(session_id=session_id, user_id=user_id)
+    now = utc_now()
+    with _LOCK:
+        conn = get_connection()
+        try:
+            conn.execute(
+                """
+                INSERT INTO three_d_jobs (
+                    job_id, session_id, user_id, status, source_image,
+                    external_task_id, result_filename, error_message,
+                    progress, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, ?)
+                """,
+                (job_id, session_id, user_id, status, source_image,
+                 external_task_id, now, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def update_3d_job(
+    job_id: str,
+    *,
+    status: str,
+    progress: int = 0,
+    result_filename: Optional[str] = None,
+    external_task_id: Optional[str] = None,
+    error_message: Optional[str] = None,
+) -> None:
+    with _LOCK:
+        conn = get_connection()
+        try:
+            if external_task_id is not None:
+                conn.execute(
+                    """
+                    UPDATE three_d_jobs
+                    SET status = ?, progress = ?, result_filename = ?,
+                        external_task_id = ?, error_message = ?, updated_at = ?
+                    WHERE job_id = ?
+                    """,
+                    (status, progress, result_filename,
+                     external_task_id, error_message, utc_now(), job_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE three_d_jobs
+                    SET status = ?, progress = ?, result_filename = ?,
+                        error_message = ?, updated_at = ?
+                    WHERE job_id = ?
+                    """,
+                    (status, progress, result_filename,
+                     error_message, utc_now(), job_id),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def get_3d_job(job_id: str, user_id: str) -> Optional[dict[str, Any]]:
+    with _LOCK:
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                """
+                SELECT job_id, session_id, user_id, status, source_image,
+                       external_task_id, result_filename, error_message,
+                       progress, created_at, updated_at
+                FROM three_d_jobs
+                WHERE job_id = ? AND user_id = ?
+                """,
+                (job_id, user_id),
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+
+def get_latest_3d_job_for_session(
+    session_id: str, user_id: str
+) -> Optional[dict[str, Any]]:
+    with _LOCK:
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                """
+                SELECT job_id, session_id, user_id, status, source_image,
+                       external_task_id, result_filename, error_message,
+                       progress, created_at, updated_at
+                FROM three_d_jobs
+                WHERE session_id = ? AND user_id = ?
+                ORDER BY created_at DESC, job_id DESC
+                LIMIT 1
+                """,
+                (session_id, user_id),
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()

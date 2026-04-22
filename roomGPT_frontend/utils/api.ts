@@ -417,6 +417,7 @@ export async function fetchRenderJob(jobId: string): Promise<{
   imageUrl?: string;
   message?: string;
   retryable: boolean;
+  threeDJobId?: string;
 }> {
   const userId = resolveUserId();
   const response = await fetch(`${API_BASE_URL}/api/render-jobs/${jobId}?user_id=${encodeURIComponent(userId)}`);
@@ -475,6 +476,45 @@ export async function mapLocalRenderImage(
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || error.message || "图片生成失败");
+  }
+  return await response.json();
+}
+
+// ============================================================================
+// 3D Model Generation
+// ============================================================================
+
+export async function request3DModel(
+  sessionId: string,
+  sourceImage: string,
+): Promise<{ job_id: string; status: string; progress: number }> {
+  const userId = resolveUserId();
+  const formData = new FormData();
+  formData.append("user_id", userId);
+  formData.append("source_image", sourceImage);
+
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/3d-model`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || error.message || "创建3D模型任务失败");
+  }
+  return await response.json();
+}
+
+export async function fetch3DJobStatus(jobId: string): Promise<{
+  job_id: string;
+  status: string;
+  progress: number;
+  modelUrl?: string;
+  message?: string;
+}> {
+  const userId = resolveUserId();
+  const response = await fetch(`${API_BASE_URL}/api/3d-jobs/${jobId}?user_id=${encodeURIComponent(userId)}`);
+  if (!response.ok) {
+    throw new Error("查询3D任务状态失败");
   }
   return await response.json();
 }
