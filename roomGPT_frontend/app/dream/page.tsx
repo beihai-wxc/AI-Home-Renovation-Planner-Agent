@@ -15,7 +15,7 @@ import downloadPhoto from "../../utils/downloadPhoto";
 import DropDown from "../../components/DropDown";
 import { roomLabels, roomType, rooms, themeLabels, themeType, themes } from "../../utils/dropdownTypes";
 import { createAndStoreSessionId, getCurrentSessionId } from "../../utils/session";
-import { ensureSessionExists, mapLocalRenderImage } from "../../utils/api";
+import { ensureSessionExists, quickGenerateImage } from "../../utils/api";
 import { isAuthenticated } from "../../utils/auth";
 
 // 加载手写字体
@@ -132,7 +132,7 @@ export default function DreamPage() {
       setPhotoName(file.name);
       const url = URL.createObjectURL(file);
       setOriginalPhoto(url);
-      void generatePhotoFromLocal(file);
+      void generatePhotoFromApi(file);
     }
     e.target.value = "";
   };
@@ -176,36 +176,36 @@ export default function DreamPage() {
     </div>
   );
 
-  const generatePhotoFromLocal = async (file: File | null = null) => {
+  const generatePhotoFromApi = async (file: File | null = null) => {
     const requestId = generationRequestIdRef.current + 1;
     generationRequestIdRef.current = requestId;
     beginGenerationTransition();
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     try {
-      const mapped = await mapLocalRenderImage(file?.name ?? null, themeLabels[theme], roomLabels[room]);
+      const generated = await quickGenerateImage(file, themeLabels[theme], roomLabels[room]);
       if (generationRequestIdRef.current !== requestId) {
         return;
       }
-      if (!mapped.imageUrl) {
+      if (!generated.imageUrl) {
         setRestoredImage(null);
-        setError(mapped.message || "图片生成失败");
+        setError(generated.message || "图片生成失败");
         return;
       }
-      if (!file && mapped.originalImageUrl) {
-        setOriginalPhoto(mapped.originalImageUrl);
+      if (!file && generated.originalImageUrl) {
+        setOriginalPhoto(generated.originalImageUrl);
       }
       if (!file) {
         setPhotoName(`${roomLabels[room]}-${themeLabels[theme]}.png`);
       }
       setSelectionDirty(false);
-      setRestoredImage(mapped.imageUrl);
-    } catch (err) {
+      setRestoredImage(generated.imageUrl);
+    } catch (err: any) {
       if (generationRequestIdRef.current !== requestId) {
         return;
       }
-      console.warn("local render mapping failed", err);
-      setError("读取本地图像库失败，请检查素材目录或稍后重试。");
+      console.warn("api render failed", err);
+      setError(err.message || "效果图生成失败，请稍后重试。");
     } finally {
       if (generationRequestIdRef.current === requestId) {
         setLoading(false);

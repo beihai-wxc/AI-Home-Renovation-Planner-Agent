@@ -263,7 +263,8 @@ export async function sendChatMessageStream(
   onReferences: (links: Array<{ title: string; url: string; snippet?: string; source?: string }>) => void,
   onDone: () => void,
   onError: (error: string) => void,
-  sessionId: string
+  sessionId: string,
+  useRag?: boolean
 ): Promise<void> {
   let hasStreamError = false;
   try {
@@ -275,6 +276,7 @@ export async function sendChatMessageStream(
         message,
         user_id: userId,
         session_id: sessionId,
+        use_rag: useRag || false,
       }),
     });
 
@@ -324,7 +326,8 @@ export async function sendChatWithImageStream(
   onRenderQueued: (jobId: string) => void,
   onDone: () => void,
   onError: (error: string) => void,
-  sessionId: string
+  sessionId: string,
+  useRag?: boolean
 ): Promise<void> {
   let hasStreamError = false;
   try {
@@ -333,6 +336,7 @@ export async function sendChatWithImageStream(
     formData.append("message", message);
     formData.append("user_id", userId);
     formData.append("session_id", sessionId);
+    formData.append("use_rag", String(useRag || false));
 
     (images.currentRoomImages || []).forEach((file) => {
       formData.append("current_room_images", file);
@@ -471,22 +475,24 @@ export async function fetchRecommendedPrompts(limit = 6): Promise<string[]> {
   return Array.isArray(data.prompts) ? data.prompts : [];
 }
 
-export async function mapLocalRenderImage(
-  originalFilename: string | null,
+export async function quickGenerateImage(
+  imageFile: File | null,
   style: string,
   room: string
 ): Promise<{ imageUrl?: string; originalImageUrl?: string; message?: string; mode: string }> {
   const formData = new FormData();
-  formData.append("original_filename", originalFilename || "");
+  if (imageFile) {
+    formData.append("image", imageFile);
+  }
   formData.append("style", style);
   formData.append("room", room);
 
-  const response = await fetch(`${API_BASE_URL}/api/local-render-map`, {
+  const response = await fetch(`${API_BASE_URL}/api/quick-generate`, {
     method: "POST",
     body: formData,
   });
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json().catch(() => ({}));
     throw new Error(error.detail || error.message || "图片生成失败");
   }
   return await response.json();

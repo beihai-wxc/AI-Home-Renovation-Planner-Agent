@@ -19,8 +19,9 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel
 
 from agent import graph, render_graph
-from llm_provider import encode_image_to_base64_message
+from llm_provider import encode_image_to_base64_message, get_chat_llm
 from langchain_core.messages import HumanMessage
+from tools import generate_renovation_rendering_tool
 from db import (
     create_render_job,
     create_3d_job,
@@ -32,6 +33,7 @@ from db import (
     get_messages,
     init_db,
     list_sessions,
+    latest_asset,
     save_asset,
     save_message,
     save_message_assets,
@@ -126,6 +128,7 @@ class ChatRequest(BaseModel):
     message: str
     user_id: str = DEFAULT_USER
     session_id: str = DEFAULT_SESSION
+    use_rag: bool = False
 
 
 class ChatResponse(BaseModel):
@@ -423,269 +426,6 @@ def strip_html(text: str) -> str:
         return ""
     cleaned = re.sub(r"<[^>]+>", "", text)
     return re.sub(r"\s+", " ", unescape(cleaned)).strip()
-
-
-def find_existing_file_by_stem(directory: Path, stem: str) -> Optional[Path]:
-    if not directory.exists():
-        return None
-    patterns = [f"{stem}.png", f"{stem}.jpg", f"{stem}.jpeg", f"{stem}.webp"]
-    for name in patterns:
-        candidate = directory / name
-        if candidate.exists():
-            return candidate
-    for candidate in directory.iterdir():
-        if candidate.is_file() and candidate.stem.lower() == stem.lower():
-            return candidate
-    return None
-
-
-def find_existing_file_by_name(directory: Path, filename: str) -> Optional[Path]:
-    if not directory.exists():
-        return None
-    target = filename.strip()
-    if not target:
-        return None
-    exact = directory / target
-    if exact.exists() and exact.is_file():
-        return exact
-    lowered = target.lower()
-    for candidate in directory.iterdir():
-        if candidate.is_file() and candidate.name.lower() == lowered:
-            return candidate
-    return None
-
-
-def find_matching_file_by_stems(directory: Path, stems: list[str]) -> Optional[Path]:
-    if not directory.exists():
-        return None
-
-    normalized_stems = [stem.strip() for stem in stems if stem and stem.strip()]
-    if not normalized_stems:
-        return None
-
-    for stem in normalized_stems:
-        matched = find_existing_file_by_stem(directory, stem)
-        if matched:
-            return matched
-
-    lowered_stems = [stem.lower() for stem in normalized_stems]
-    for candidate in directory.iterdir():
-        if not candidate.is_file():
-            continue
-        candidate_stem = candidate.stem.lower()
-        if any(candidate_stem.startswith(stem) for stem in lowered_stems):
-            return candidate
-    return None
-
-
-def resolve_local_image_dirs() -> tuple[Path, Path]:
-    original_dir = LOCAL_ORIGINAL_DIR
-    rendered_dir = LOCAL_RENDERED_DIR
-    if original_dir.exists() and rendered_dir.exists():
-        return original_dir, rendered_dir
-
-    search_roots: list[Path] = []
-    if FRONTEND_PUBLIC_ROOT.exists():
-        search_roots.append(FRONTEND_PUBLIC_ROOT)
-    search_roots.append(Path(os.getcwd()))
-
-    def scan_dirs(root: Path) -> list[Path]:
-        found: list[Path] = []
-        try:
-            for path in root.rglob("*"):
-                if path.is_dir():
-                    found.append(path)
-        except Exception:
-            return found
-        return found
-
-    all_dirs: list[Path] = []
-    for root in search_roots:
-        all_dirs.extend(scan_dirs(root))
-
-    def find_dir(keyword: str) -> Optional[Path]:
-        for folder in all_dirs:
-            if keyword in folder.name:
-                return folder
-        return None
-
-    original_fallback = find_dir("原始")
-    rendered_fallback = find_dir("渲染")
-    return original_fallback or original_dir, rendered_fallback or rendered_dir
-
-
-def get_local_library_roots() -> list[Path]:
-    roots: list[Path] = []
-    for root in [Path(os.getcwd()), FRONTEND_PUBLIC_ROOT]:
-        resolved = root.resolve()
-        if resolved not in roots:
-            roots.append(resolved)
-    return roots
-
-
-def relative_local_library_path(file_path: Path) -> Optional[str]:
-    resolved = file_path.resolve()
-    for root in get_local_library_roots():
-        try:
-            return resolved.relative_to(root).as_posix()
-        except ValueError:
-            continue
-    return None
-
-
-def normalize_style_label(style: str) -> str:
-    aliases = {
-        "简约风": "极简风",
-        "极简风": "极简风",
-        "modern": "现代风",
-        "现代风": "现代风",
-        "现代北欧风": "现代北欧风",
-        "vintage": "复古风",
-        "复古风": "复古风",
-        "professional": "商务风",
-        "商务风": "商务风",
-        "tropical": "热带风",
-        "热带风": "热带风",
-    }
-    key = (style or "").strip()
-    return aliases.get(key.lower(), aliases.get(key, key))
-
-
-def normalize_room_label(room: str) -> str:
-    aliases = {
-        "living room": "客厅",
-        "客厅": "客厅",
-        "bedroom": "卧室",
-        "卧室": "卧室",
-        "房间": "卧室",
-    }
-    key = (room or "").strip()
-    return aliases.get(key.lower(), aliases.get(key, key))
-
-
-def resolve_room_library_dir(room: str) -> Optional[Path]:
-    normalized_room = normalize_room_label(room)
-    if not normalized_room:
-        return None
-
-    for root in get_local_library_roots():
-        try:
-            for candidate in root.iterdir():
-                if (
-                    candidate.is_dir()
-                    and candidate.name.startswith("一转五风格_")
-                    and normalized_room in candidate.name
-                ):
-                    return candidate
-        except FileNotFoundError:
-            continue
-    return None
-
-
-def extract_render_index_from_filename(filename: str) -> Optional[str]:
-    stem = Path(filename or "").stem.strip()
-    if not stem:
-        return None
-
-    b_match = re.search(r"(?i)B(\d+)", stem)
-    if b_match:
-        return b_match.group(1)
-
-    trailing_digit_match = re.search(r"(\d)$", stem)
-    if trailing_digit_match:
-        return trailing_digit_match.group(1)
-
-    return None
-
-
-def resolve_local_render_mapping(
-    *,
-    original_filename: Optional[str],
-    style: Optional[str],
-    room: Optional[str] = None,
-) -> dict[str, Optional[str]]:
-    style = (style or "").strip()
-    original_filename = (original_filename or "").strip()
-    normalized_style = normalize_style_label(style)
-    normalized_room = normalize_room_label(room or "")
-    default_style_map = {
-        "简约风": "简约风",
-        "极简风": "简约风",
-        "现代北欧风": "现代北欧风",
-        "现代风": "现代北欧风",
-    }
-
-    original_dir, rendered_dir = resolve_local_image_dirs()
-
-    if original_filename:
-        stem = Path(original_filename).stem
-        render_index = extract_render_index_from_filename(original_filename)
-        if render_index:
-            mapped_stem = f"A{render_index}"
-            rendered = find_existing_file_by_stem(rendered_dir, mapped_stem)
-            original = find_existing_file_by_name(original_dir, Path(original_filename).name)
-            if not original:
-                original = find_matching_file_by_stems(original_dir, [stem, f"B{render_index}"])
-            if not rendered:
-                return {"image_url": None, "message": f"未找到与 {stem} 对应的渲染图（期望 {mapped_stem}）。"}
-            return {
-                "image_filename": rendered.name,
-                "image_kind": "rendered",
-                "original_filename": original.name if original else None,
-                "original_kind": "original" if original else None,
-                "message": None,
-            }
-
-    if normalized_room:
-        room_dir = resolve_room_library_dir(normalized_room)
-        if room_dir:
-            rendered = find_matching_file_by_stems(room_dir, [normalized_style, style])
-            original = find_matching_file_by_stems(
-                room_dir,
-                [normalized_room, "原图", "原图1"],
-            )
-            if rendered:
-                return {
-                    "image_filename": rendered.name,
-                    "image_kind": "library",
-                    "image_path": relative_local_library_path(rendered),
-                    "original_filename": original.name if original else None,
-                    "original_kind": "library" if original else None,
-                    "original_path": relative_local_library_path(original) if original else None,
-                    "message": None,
-                }
-
-    style_key = default_style_map.get(normalized_style) or default_style_map.get(style)
-    if not style_key:
-        if normalized_room:
-            return {
-                "image_url": None,
-                "message": "图片生成失败",
-            }
-        return {"image_url": None, "message": "当前无图直生仅支持简约风、现代北欧风。"}
-    rendered = find_existing_file_by_stem(rendered_dir, style_key)
-    if not rendered:
-        return {"image_url": None, "message": f"未找到风格示例图：{style_key}。"}
-    return {
-        "image_filename": rendered.name,
-        "image_kind": "rendered",
-        "original_filename": None,
-        "original_kind": None,
-        "message": None,
-    }
-
-
-def extract_style_from_message(message: str) -> str:
-    text = (message or "").strip()
-    if not text:
-        return ""
-    if "现代北欧风" in text:
-        return "现代北欧风"
-    if "简约风" in text:
-        return "简约风"
-    if "现代风" in text:
-        return "现代风"
-    return ""
 
 
 async def web_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
@@ -1130,40 +870,53 @@ async def furniture_match_endpoint(
     return VisionShoppingResponse(message=assistant_message, references=references)
 
 
-@app.post("/api/local-render-map", response_model=LocalRenderResponse)
-async def local_render_map_endpoint(
+class QuickGenerateResponse(BaseModel):
+    imageUrl: Optional[str] = None
+    originalImageUrl: Optional[str] = None
+    message: Optional[str] = None
+    mode: str = "real"
+
+@app.post("/api/quick-generate", response_model=QuickGenerateResponse)
+async def quick_generate_endpoint(
     request: Request,
-    original_filename: str = Form(""),
     style: str = Form(""),
     room: str = Form(""),
+    image: UploadFile | None = File(None),
+    user_id: str = Form(DEFAULT_USER),
+    session_id: str = Form(DEFAULT_SESSION),
 ):
-    mapping = resolve_local_render_mapping(original_filename=original_filename, style=style, room=room)
-    image_filename = mapping.get("image_filename")
-    image_kind = mapping.get("image_kind") or "rendered"
-    image_path = mapping.get("image_path")
-    original_filename_mapped = mapping.get("original_filename")
-    original_kind = mapping.get("original_kind") or "original"
-    original_path = mapping.get("original_path")
-    image_url = (
-        str(request.url_for("local_library_asset", library_path=quote(image_path)))
-        if image_kind == "library" and image_path
-        else str(request.url_for("local_file_asset", kind="rendered", filename=quote(image_filename)))
-        if image_filename
-        else None
-    )
-    original_url = (
-        str(request.url_for("local_library_asset", library_path=quote(original_path)))
-        if original_kind == "library" and original_path
-        else str(request.url_for("local_file_asset", kind="original", filename=quote(original_filename_mapped)))
-        if original_filename_mapped
-        else None
-    )
-    return LocalRenderResponse(
-        mode=IMAGE_GENERATION_MODE,
-        imageUrl=image_url,
-        originalImageUrl=original_url,
-        message=mapping.get("message"),
-    )
+    require_api_key()
+    ensure_session(session_id=session_id, user_id=user_id, title=f"快速生成: {room[:10]} - {style[:10]}")
+
+    original_url = None
+    if image and image.filename:
+        ext = Path(image.filename).suffix
+        filename = f"quick_gen_{uuid.uuid4().hex}{ext}"
+        filepath = os.path.join(ARTIFACT_ROOT, filename)
+        content = await image.read()
+        with open(filepath, "wb") as f:
+            f.write(content)
+        save_asset(session_id, user_id, filename, "current_room", 1)
+        original_url = str(request.url_for("get_asset", session_id=session_id, filename=quote(filename)))
+
+    llm = get_chat_llm(temperature=0.6)
+    expansion_prompt = f"我要装修{room}，风格是{style}。请为这个房间写一段专门用于文生图模型的超写实高质量英文Prompt。要求：使用SLC公式（Subject, Lighting, Camera），只需返回英文prompt内容，不要任何多余描述或前缀后缀。"
+    response = await llm.ainvoke([HumanMessage(content=expansion_prompt)])
+    detailed_prompt = response.content.strip()
+
+    config = {"configurable": {"session_id": session_id, "user_id": user_id}}
+    res_msg = await generate_renovation_rendering_tool.ainvoke({
+        "prompt": detailed_prompt,
+        "aspect_ratio": "16:9",
+        "asset_name": "quick_render"
+    }, config=config)
+
+    recent_image = latest_asset(session_id, user_id, "generated_render")
+    if recent_image and isinstance(recent_image, dict) and recent_image.get("filename"):
+        image_url = str(request.url_for("get_asset", session_id=session_id, filename=quote(recent_image["filename"])))
+        return QuickGenerateResponse(imageUrl=image_url, originalImageUrl=original_url, message="生成成功")
+
+    raise HTTPException(status_code=500, detail=f"图片生成失败: {res_msg}")
 
 
 @app.get("/api/local-files/{kind}/{filename:path}", name="local_file_asset")
@@ -1532,8 +1285,17 @@ async def chat_stream_endpoint(payload: ChatRequest):
 
     try:
         from langchain_core.messages import HumanMessage
+        from rag.retriever import get_retriever
+        
         guarded_message = build_non_image_guarded_prompt(payload.message)
         
+        if payload.use_rag:
+            retriever = get_retriever()
+            entries = await retriever.search(payload.message, top_k=3)
+            rag_context = retriever.build_rag_context(entries)
+            if rag_context:
+                guarded_message = f"{rag_context}\n\n用户问题：{guarded_message}"
+
         async def event_stream():
             config = {"configurable": {"thread_id": payload.session_id, "user_id": payload.user_id, "session_id": payload.session_id}}
             input_state = {"messages": [HumanMessage(content=guarded_message)], "session_id": payload.session_id, "user_id": payload.user_id}
@@ -1607,34 +1369,6 @@ async def chat_with_image_endpoint(
     user_id: str = Form(DEFAULT_USER),
     session_id: str = Form(DEFAULT_SESSION),
 ):
-    if IMAGE_GENERATION_MODE == "local_mock" and user_id == QUICK_GENERATE_USER:
-        ensure_session(session_id=session_id, user_id=user_id, title=message[:80] or "快速生成")
-        uploaded_image = (current_room_images or [None])[0] or (inspiration_images or [None])[0] or current_room_image or image
-        mapping = resolve_local_render_mapping(
-            original_filename=getattr(uploaded_image, "filename", "") if uploaded_image else "",
-            style=extract_style_from_message(message),
-        )
-        image_filename = mapping.get("image_filename")
-        image_url = (
-            str(request.url_for("local_file_asset", kind="rendered", filename=quote(image_filename)))
-            if image_filename
-            else None
-        )
-        response_message = mapping.get("message") or "已从本地渲染库返回效果图（未调用实时生成模型）。"
-        persist_chat_records(
-            user_id=user_id,
-            session_id=session_id,
-            user_message=message,
-            assistant_message=response_message,
-            result_filename=None,
-            references=[],
-        )
-        return ChatResponse(
-            message=response_message,
-            imageUrl=image_url,
-            references=[],
-        )
-
     require_api_key()
     ensure_session(session_id=session_id, user_id=user_id, title=message[:80] or "新对话")
 
@@ -1696,13 +1430,24 @@ async def chat_with_image_stream_endpoint(
     image: UploadFile | None = File(None),
     user_id: str = Form(DEFAULT_USER),
     session_id: str = Form(DEFAULT_SESSION),
+    use_rag: bool = Form(False),
 ):
     require_api_key()
     ensure_session(session_id=session_id, user_id=user_id, title=message[:80] or "新对话")
 
     try:
         from langchain_core.messages import HumanMessage
+        from rag.retriever import get_retriever
+        
         effective_message = message if ((current_room_images and len(current_room_images) > 0) or (inspiration_images and len(inspiration_images) > 0) or current_room_image or image) else build_non_image_guarded_prompt(message)
+        
+        if use_rag:
+            retriever = get_retriever()
+            entries = await retriever.search(message, top_k=3)
+            rag_context = retriever.build_rag_context(entries)
+            if rag_context:
+                effective_message = f"{rag_context}\n\n用户问题：{effective_message}"
+
         message_content, uploaded_assets = await prepare_message_content(
             message=effective_message,
             user_id=user_id,
@@ -1779,6 +1524,14 @@ async def chat_with_image_stream_endpoint(
     except Exception as exc:
         logger.error("Error during chat-with-image stream: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/knowledge/search")
+async def knowledge_search_endpoint(q: str, limit: int = 3):
+    from rag.retriever import get_retriever
+    retriever = get_retriever()
+    entries = await retriever.search(q, top_k=limit)
+    return {"results": entries}
 
 
 @app.exception_handler(HTTPException)

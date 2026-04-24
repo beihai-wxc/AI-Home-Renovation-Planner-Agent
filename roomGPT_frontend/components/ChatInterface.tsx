@@ -15,7 +15,6 @@ import {
 import ChatMessageActions from "./ChatMessageActions";
 import QuickPrompts from "./QuickPrompts";
 import ChatActions from "./ChatActions";
-import QuickScenes from "./QuickScenes";
 import AgentStatus from "./AgentStatus";
 import {
   ChatMessage,
@@ -99,7 +98,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
   const [input, setInput] = useState("");
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [showQuickScenes, setShowQuickScenes] = useState(false);
+  const [ragEnabled, setRagEnabled] = useState(false);
   const [showInspirationComposer, setShowInspirationComposer] = useState(false);
   const [pendingUploadKind, setPendingUploadKind] = useState<"general" | "current_room" | "inspiration" | "vision_match">("general");
   const [pendingRenderJobId, setPendingRenderJobId] = useState<string | null>(null);
@@ -302,15 +301,6 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     setInput(prompt);
   };
 
-  const handleSelectScene = (scene: string, style?: string) => {
-    let nextInput = scene ? `我想装修${scene}，` : input;
-    if (style) {
-      nextInput += `请设计${style}风格的方案。`;
-    }
-    setInput(nextInput);
-    setShowQuickScenes(false);
-  };
-
   const buildImageId = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 
   const appendSelectedImages = (files: File[], kind: "general" | "current_room" | "inspiration" | "vision_match") => {
@@ -420,7 +410,6 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
       },
     ]);
     setInput("");
-    setShowQuickScenes(false);
     setIsSending(true);
     setFailedDraft(null);
     setActiveAssistantMessageId(tempMessageId);
@@ -541,7 +530,8 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           },
           handleComplete,
           handleError,
-          sessionId
+          sessionId,
+          ragEnabled
         );
       } else {
         await sendChatMessageStream(
@@ -554,7 +544,8 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
           updateReferences,
           handleComplete,
           handleError,
-          sessionId
+          sessionId,
+          ragEnabled
         );
       }
     } catch (error) {
@@ -943,18 +934,11 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
       </div>
 
       {/* 快速提示词面板 */}
-      {!showQuickScenes && messages.length === 0 && (
+      {messages.length === 0 && (
         <div className="px-4 pb-0">
           <QuickPrompts
             onSelect={handleSelectQuickPrompt}
           />
-        </div>
-      )}
-
-      {/* 场景选择面板 */}
-      {showQuickScenes && (
-        <div className="px-4 pb-2">
-          <QuickScenes onSelect={handleSelectScene} />
         </div>
       )}
 
@@ -1215,20 +1199,18 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
               </button>
               <button
                 type="button"
-                onClick={() => setShowQuickScenes((prev) => !prev)}
+                onClick={() => setRagEnabled((prev) => !prev)}
                 disabled={isSending}
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium transition disabled:opacity-60 ${
-                  showQuickScenes
+                  ragEnabled
                     ? "bg-[#5C7B60] text-white shadow-md"
                     : "text-[#5C7B60] hover:bg-[#EEF5EF]"
                 }`}
               >
                 <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 12h10" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 17h4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                 </svg>
-                场景选择
+                📚 知识库
               </button>
             </div>
 

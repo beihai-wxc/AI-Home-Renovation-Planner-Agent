@@ -93,10 +93,16 @@ const agentShowcase = [
 ];
 
 export default function HomePage() {
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
+    // 检查是否已经播放过开屏动画
+    if (!sessionStorage.getItem("lumiere_intro_seen")) {
+      setShowIntro(true);
+      sessionStorage.setItem("lumiere_intro_seen", "true");
+    }
+
     const sync = () => setIsLoggedIn(Boolean(getCurrentUser()));
     sync();
     window.addEventListener("storage", sync);
