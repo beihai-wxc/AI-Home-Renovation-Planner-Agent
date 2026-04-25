@@ -24,11 +24,6 @@ from langchain_core.messages import HumanMessage
 from tools import generate_renovation_rendering_tool
 from db import (
     create_render_job,
-    create_3d_job,
-    delete_session,
-    ensure_session,
-    get_render_job,
-    get_3d_job,
     get_latest_3d_job_for_source_image,
     get_messages,
     init_db,
@@ -40,7 +35,6 @@ from db import (
     set_session_pinned,
     session_state_snapshot,
     update_render_job,
-    update_3d_job,
 )
 
 
@@ -151,10 +145,6 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     imageUrl: Optional[str] = None
-    modelUrl: Optional[str] = None
-    threeDJobId: Optional[str] = None
-    threeDStatus: Optional[str] = None
-    threeDProgress: Optional[int] = None
     attachments: Optional[list[dict[str, str]]] = None
     references: Optional[list[dict[str, str]]] = None
     created_at: str
@@ -166,7 +156,6 @@ class RenderJobResponse(BaseModel):
     imageUrl: Optional[str] = None
     message: Optional[str] = None
     retryable: bool = False
-    threeDJobId: Optional[str] = None
 
 
 class LocalRenderResponse(BaseModel):
@@ -726,16 +715,6 @@ async def process_render_job(
                 content=build_render_completion_message(True, reply_text),
                 image_filename=result_filename,
             )
-            # 自动触发 3D 模型生成
-            try:
-                three_d_job_id = await queue_3d_job(
-                    user_id=user_id,
-                    session_id=session_id,
-                    source_image=result_filename,
-                )
-                logger.info("自动触发 3D 生成: job_id=%s, source=%s", three_d_job_id, result_filename)
-            except Exception as exc_3d:
-                logger.warning("自动触发 3D 生成失败（不影响效果图）: %s", exc_3d)
         else:
             update_render_job(
                 job_id,
@@ -992,16 +971,6 @@ async def get_session_messages(request: Request, session_id: str, user_id: str =
     results: list[MessageResponse] = []
     for message in messages:
         image_filename = message.get("image_filename")
-        three_d_job = (
-            get_latest_3d_job_for_source_image(session_id, user_id, image_filename)
-            if image_filename
-            else None
-        )
-        model_url = (
-            build_asset_url(request, session_id, three_d_job["result_filename"], user_id)
-            if three_d_job and three_d_job.get("result_filename")
-            else None
-        )
         results.append(
             MessageResponse(
                 id=str(message["id"]),
@@ -1010,10 +979,6 @@ async def get_session_messages(request: Request, session_id: str, user_id: str =
                 imageUrl=build_asset_url(request, session_id, image_filename, user_id)
                 if image_filename
                 else None,
-                modelUrl=model_url,
-                threeDJobId=three_d_job["job_id"] if three_d_job else None,
-                threeDStatus=three_d_job.get("status") if three_d_job else None,
-                threeDProgress=three_d_job.get("progress") if three_d_job else None,
                 attachments=[
                     {
                         "id": f"{message['id']}-{idx}",
@@ -1037,9 +1002,6 @@ async def get_render_job_endpoint(request: Request, job_id: str, user_id: str = 
     job = get_render_job(job_id, user_id=user_id)
     if not job:
         raise HTTPException(status_code=404, detail="Render job not found.")
-    # Check for any associated 3D job on this session
-    from db import get_latest_3d_job_for_session
-    three_d_job = get_latest_3d_job_for_session(job["session_id"], user_id)
     return RenderJobResponse(
         job_id=job["job_id"],
         status=job["status"],
@@ -1048,7 +1010,6 @@ async def get_render_job_endpoint(request: Request, job_id: str, user_id: str = 
         else None,
         message=job.get("error_message"),
         retryable=job["status"] == "failed",
-        threeDJobId=three_d_job["job_id"] if three_d_job else None,
     )
 
 
@@ -1080,159 +1041,7 @@ async def get_asset(session_id: str, filename: str, user_id: str = DEFAULT_USER)
     return FileResponse(filepath)
 
 
-# ============================================================================
-# 3D Model Generation Endpoints
-# ============================================================================
 
-class ThreeDJobResponse(BaseModel):
-    job_id: str
-    status: str
-    progress: int = 0
-    modelUrl: Optional[str] = None
-    message: Optional[str] = None
-
-
-async def queue_3d_job(
-    *,
-    user_id: str,
-    session_id: str,
-    source_image: str,
-) -> str:
-    """创建并启动 3D 生成后台任务"""
-    job_id = uuid.uuid4().hex
-    create_3d_job(
-        job_id=job_id,
-        session_id=session_id,
-        user_id=user_id,
-        source_image=source_image,
-    )
-    asyncio.create_task(
-        process_3d_job(
-            job_id=job_id,
-            user_id=user_id,
-            session_id=session_id,
-            source_image=source_image,
-        )
-    )
-    return job_id
-
-
-async def process_3d_job(
-    *,
-    job_id: str,
-    user_id: str,
-    session_id: str,
-    source_image: str,
-) -> None:
-    """后台任务：提交到腾讯云 → 轮询 → 下载 GLB"""
-    from three_d_provider import submit_image_to_3d, poll_and_download
-
-    async def handle_progress(status: str, progress: int) -> None:
-        mapped_status = "processing" if status in {"pending", "processing"} else status
-        current_progress = max(15, progress) if mapped_status == "processing" else progress
-        update_3d_job(
-            job_id,
-            status=mapped_status,
-            progress=current_progress,
-            external_task_id=external_task_id,
-        )
-
-    update_3d_job(job_id, status="processing", progress=5)
-    try:
-        image_path = os.path.join(ARTIFACT_ROOT, source_image)
-        if not os.path.exists(image_path):
-            update_3d_job(
-                job_id, status="failed",
-                error_message=f"效果图文件不存在: {source_image}",
-            )
-            return
-
-        # 1. 提交到腾讯云
-        external_task_id = await submit_image_to_3d(image_path)
-        update_3d_job(
-            job_id, status="processing", progress=15,
-            external_task_id=external_task_id,
-        )
-
-        # 2. 轮询并下载 GLB
-        glb_filename = f"3d_model_{job_id[:8]}.glb"
-        result = await poll_and_download(
-            job_id=external_task_id,
-            save_filename=glb_filename,
-            max_wait_seconds=300,
-            poll_interval=5.0,
-            progress_callback=handle_progress,
-        )
-
-        if result["status"] == "completed" and result.get("glb_path"):
-            update_3d_job(
-                job_id, status="completed", progress=100,
-                result_filename=glb_filename,
-            )
-            save_asset(
-                session_id=session_id,
-                user_id=user_id,
-                filename=glb_filename,
-                asset_type="3d_model",
-                version=1,
-                metadata={"source_image": source_image},
-            )
-            logger.info("3D 模型生成成功: %s", glb_filename)
-        else:
-            update_3d_job(
-                job_id, status="failed",
-                progress=result.get("progress", 0),
-                error_message=result.get("error", "3D 模型生成失败"),
-            )
-            logger.warning("3D 模型生成失败: %s", result.get("error"))
-
-    except Exception as exc:
-        logger.error("3D 生成后台任务异常: %s", exc)
-        update_3d_job(
-            job_id, status="failed",
-            error_message=f"3D 模型生成出错: {exc}",
-        )
-
-
-@app.post("/api/sessions/{session_id}/3d-model", response_model=ThreeDJobResponse)
-async def create_3d_model_endpoint(
-    request: Request,
-    session_id: str,
-    user_id: str = Form(DEFAULT_USER),
-    source_image: str = Form(...),
-):
-    """手动触发 3D 模型生成（效果图已自动触发时，此接口可用于重试）"""
-    ensure_session(session_id=session_id, user_id=user_id)
-    job_id = await queue_3d_job(
-        user_id=user_id,
-        session_id=session_id,
-        source_image=source_image,
-    )
-    return ThreeDJobResponse(job_id=job_id, status="pending", progress=0)
-
-
-@app.get("/api/3d-jobs/{job_id}", response_model=ThreeDJobResponse)
-async def get_3d_job_endpoint(
-    request: Request,
-    job_id: str,
-    user_id: str = DEFAULT_USER,
-):
-    """查询 3D 生成任务状态"""
-    job = get_3d_job(job_id, user_id=user_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="3D job not found.")
-    model_url = (
-        build_asset_url(request, job["session_id"], job["result_filename"], user_id)
-        if job.get("result_filename")
-        else None
-    )
-    return ThreeDJobResponse(
-        job_id=job["job_id"],
-        status=job["status"],
-        progress=job.get("progress", 0),
-        modelUrl=model_url,
-        message=job.get("error_message"),
-    )
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -1289,16 +1098,15 @@ async def chat_stream_endpoint(payload: ChatRequest):
         
         guarded_message = build_non_image_guarded_prompt(payload.message)
         
+        rag_context = ""
         if payload.use_rag:
             retriever = get_retriever()
             entries = await retriever.search(payload.message, top_k=3)
             rag_context = retriever.build_rag_context(entries)
-            if rag_context:
-                guarded_message = f"{rag_context}\n\n用户问题：{guarded_message}"
 
         async def event_stream():
             config = {"configurable": {"thread_id": payload.session_id, "user_id": payload.user_id, "session_id": payload.session_id}}
-            input_state = {"messages": [HumanMessage(content=guarded_message)], "session_id": payload.session_id, "user_id": payload.user_id}
+            input_state = {"messages": [HumanMessage(content=guarded_message)], "session_id": payload.session_id, "user_id": payload.user_id, "rag_context": rag_context}
             
             final_reply = []
             
@@ -1441,12 +1249,11 @@ async def chat_with_image_stream_endpoint(
         
         effective_message = message if ((current_room_images and len(current_room_images) > 0) or (inspiration_images and len(inspiration_images) > 0) or current_room_image or image) else build_non_image_guarded_prompt(message)
         
+        rag_context = ""
         if use_rag:
             retriever = get_retriever()
             entries = await retriever.search(message, top_k=3)
             rag_context = retriever.build_rag_context(entries)
-            if rag_context:
-                effective_message = f"{rag_context}\n\n用户问题：{effective_message}"
 
         message_content, uploaded_assets = await prepare_message_content(
             message=effective_message,
@@ -1460,7 +1267,7 @@ async def chat_with_image_stream_endpoint(
         
         async def event_stream():
             config = {"configurable": {"thread_id": session_id, "user_id": user_id, "session_id": session_id}}
-            input_state = {"messages": [message_content], "session_id": session_id, "user_id": user_id}
+            input_state = {"messages": [message_content], "session_id": session_id, "user_id": user_id, "rag_context": rag_context}
             final_reply = []
             
             async for event in graph.astream_events(input_state, config=config, version="v1"):

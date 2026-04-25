@@ -44,6 +44,9 @@ class RenovationState(TypedDict):
     key_issues: str
     opportunities: str
     budget_constraint: str
+    
+    # RAG knowledge retrieval context
+    rag_context: str
 
 
 class RouteDecision(BaseModel):
@@ -110,6 +113,11 @@ EXAMPLE:
 
 Be enthusiastic about home improvement and helpful!
 """
+    # Inject RAG context if available
+    rag_context = state.get("rag_context", "")
+    if rag_context:
+        system_prompt += f"\n\n=== 知识库检索结果 ===\n{rag_context}\n=====================\n根据上述知识库内容和你的判断回答用户问题。"
+
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
     response = llm.invoke(messages)
     return {"messages": [response]}
@@ -149,6 +157,11 @@ Room Details: [Type, Analysis, Style, Key Issues, Opportunities, Budget]
 [List windows, doors, cabinets, appliances, sink exactly]
 ```
 """
+    # Inject RAG context if available
+    rag_context = state.get("rag_context", "")
+    if rag_context:
+        system_prompt += f"\n\n=== 知识库检索结果 ===\n{rag_context}\n=====================\n"
+
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
     response = llm_with_tools.invoke(messages)
     return {"messages": [response]}
@@ -184,6 +197,11 @@ ONLY specify changes to SURFACE FINISHES.
 材料清单摘要: [Details]
 ```
 """
+    # Inject RAG context if available
+    rag_context = state.get("rag_context", "")
+    if rag_context:
+        system_prompt += f"\n\n=== 知识库检索结果 ===\n{rag_context}\n=====================\n"
+
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
     response = llm_with_tools.invoke(messages)
     return {"messages": [response]}
@@ -313,6 +331,7 @@ class RenderGraphState(TypedDict):
     messages: Annotated[List[BaseMessage], operator.add]
     session_id: str
     user_id: str
+    rag_context: str
 
 
 def project_coordinator_node(state: RenderGraphState):
@@ -330,6 +349,11 @@ Use generate_renovation_rendering tool and build an ULTRA-DETAILED prompt using 
 Output language rule:
 - 最终回复必须仅使用简体中文，不得输出英文标题或英文段落。
 """
+    # Inject RAG context if available
+    rag_context = state.get("rag_context", "")
+    if rag_context:
+        system_prompt += f"\n\n=== 知识库检索结果 ===\n{rag_context}\n=====================\n"
+
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
     response = llm_with_tools.invoke(messages)
     return {"messages": [response]}

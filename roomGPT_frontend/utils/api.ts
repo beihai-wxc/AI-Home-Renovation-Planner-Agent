@@ -82,10 +82,7 @@ function buildChatMessage(data: {
   role: "user" | "assistant";
   content: string;
   imageUrl?: string | null;
-  modelUrl?: string | null;
-  threeDJobId?: string | null;
-  threeDStatus?: "pending" | "processing" | "completed" | "failed" | null;
-  threeDProgress?: number | null;
+
   references?: Array<{
     title: string;
     url: string;
@@ -105,10 +102,7 @@ function buildChatMessage(data: {
     role: data.role,
     content: data.content,
     imageUrl: data.imageUrl || undefined,
-    modelUrl: data.modelUrl || undefined,
-    threeDJobId: data.threeDJobId || undefined,
-    threeDStatus: data.threeDStatus || undefined,
-    threeDProgress: data.threeDProgress ?? undefined,
+
     references: data.references || undefined,
     attachments: data.attachments || undefined,
     timestamp: data.created_at ? new Date(data.created_at) : new Date(),
@@ -219,10 +213,7 @@ export async function fetchSessionMessages(sessionId: string): Promise<ChatMessa
       role: message.role,
       content: message.content,
       imageUrl: message.imageUrl,
-      modelUrl: message.modelUrl,
-      threeDJobId: message.threeDJobId,
-      threeDStatus: message.threeDStatus,
-      threeDProgress: message.threeDProgress,
+
       references: message.references,
       attachments: message.attachments,
       created_at: message.created_at,
@@ -433,7 +424,6 @@ export async function fetchRenderJob(jobId: string): Promise<{
   imageUrl?: string;
   message?: string;
   retryable: boolean;
-  threeDJobId?: string;
 }> {
   const userId = resolveUserId();
   const response = await fetch(`${API_BASE_URL}/api/render-jobs/${jobId}?user_id=${encodeURIComponent(userId)}`);
@@ -498,41 +488,3 @@ export async function quickGenerateImage(
   return await response.json();
 }
 
-// ============================================================================
-// 3D Model Generation
-// ============================================================================
-
-export async function request3DModel(
-  sessionId: string,
-  sourceImage: string,
-): Promise<{ job_id: string; status: string; progress: number }> {
-  const userId = resolveUserId();
-  const formData = new FormData();
-  formData.append("user_id", userId);
-  formData.append("source_image", sourceImage);
-
-  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/3d-model`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || error.message || "创建3D模型任务失败");
-  }
-  return await response.json();
-}
-
-export async function fetch3DJobStatus(jobId: string): Promise<{
-  job_id: string;
-  status: string;
-  progress: number;
-  modelUrl?: string;
-  message?: string;
-}> {
-  const userId = resolveUserId();
-  const response = await fetch(`${API_BASE_URL}/api/3d-jobs/${jobId}?user_id=${encodeURIComponent(userId)}`);
-  if (!response.ok) {
-    throw new Error("查询3D任务状态失败");
-  }
-  return await response.json();
-}

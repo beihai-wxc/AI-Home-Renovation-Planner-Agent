@@ -35,12 +35,6 @@ export interface ChatMessage {
   }>;
   agentName?: string;     // 来自哪个 Agent (如: VisualAssessor, DesignPlanner, ProjectCoordinator)
   timestamp: Date;
-  agentTimeline?: AgentEvent[];  // Agent 行为轨迹
-  // 3D 模型相关
-  modelUrl?: string;            // GLB 文件 URL
-  threeDJobId?: string;         // 3D 任务 ID
-  threeDStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-  threeDProgress?: number;      // 0-100
 }
 
 export interface SessionSummary {

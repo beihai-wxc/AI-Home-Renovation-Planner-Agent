@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   analyzeFurnitureMatch,
-  fetch3DJobStatus,
   fetchRecommendedPrompts,
   fetchRenderJob,
   fetchSessionMessages,
@@ -26,7 +25,6 @@ import LoadingDots from "./LoadingDots";
 import { useToast } from "./Toast";
 import MarkdownRenderer from "./MarkdownRenderer";
 import ImageLightbox from "./ImageLightbox";
-import ModelViewer from "./ModelViewer";
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -98,11 +96,10 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
   const [input, setInput] = useState("");
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [ragEnabled, setRagEnabled] = useState(false);
+  const [ragEnabled, setRagEnabled] = useState(true);
   const [showInspirationComposer, setShowInspirationComposer] = useState(false);
   const [pendingUploadKind, setPendingUploadKind] = useState<"general" | "current_room" | "inspiration" | "vision_match">("general");
   const [pendingRenderJobId, setPendingRenderJobId] = useState<string | null>(null);
-  const [pending3DJobId, setPending3DJobId] = useState<string | null>(null);
   const [failedDraft, setFailedDraft] = useState<FailedDraft | null>(null);
   const [recommendedPrompts, setRecommendedPrompts] = useState<string[]>([]);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
@@ -133,18 +130,12 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
   }, []);
 
   useEffect(() => {
-    setPending3DJobId(null);
     fetchSessionMessages(sessionId)
       .then((history) => {
         setMessages(history);
-        const active3DJob = [...history]
-          .reverse()
-          .find((message) => message.threeDJobId && message.threeDStatus && message.threeDStatus !== "completed" && message.threeDStatus !== "failed");
-        setPending3DJobId(active3DJob?.threeDJobId || null);
       })
       .catch(() => {
         setMessages([]);
-        setPending3DJobId(null);
       });
     fetchRecommendedPrompts(6)
       .then(setRecommendedPrompts)
@@ -169,7 +160,6 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
         const job = await fetchRenderJob(pendingRenderJobId);
         if (job.status === "completed") {
           setPendingRenderJobId(null);
-          const has3DJob = !!job.threeDJobId;
           setMessages((prev) => {
             const next = prev.map((msg) =>
               msg.renderJobId === job.job_id
@@ -185,25 +175,12 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
               {
                 id: `render-${job.job_id}`,
                 role: "assistant",
-                content: has3DJob
-                  ? "效果图已生成，3D 模型正在后台生成中…"
-                  : "效果图已生成，你可以继续告诉我想微调的部分。",
+                content: "效果图已生成，你可以继续告诉我想微调的部分。",
                 imageUrl: job.imageUrl,
-                ...(has3DJob
-                  ? {
-                      threeDStatus: "processing" as const,
-                      threeDJobId: job.threeDJobId!,
-                      threeDProgress: 0,
-                    }
-                  : {}),
                 timestamp: new Date(),
               },
             ];
           });
-          // Start polling 3D job if auto-triggered
-          if (has3DJob) {
-            setPending3DJobId(job.threeDJobId!);
-          }
           showToast("效果图已生成", "success");
         } else if (job.status === "failed") {
           setPendingRenderJobId(null);
@@ -229,59 +206,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
     return () => window.clearInterval(poll);
   }, [pendingRenderJobId, showToast]);
 
-  // === 3D Job Polling ===
-  useEffect(() => {
-    if (!pending3DJobId) return;
 
-    const poll = window.setInterval(async () => {
-      try {
-        const job = await fetch3DJobStatus(pending3DJobId);
-
-        // Update progress on messages that have this 3D job
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.threeDJobId === job.job_id
-              ? { ...msg, threeDProgress: job.progress }
-              : msg
-          )
-        );
-
-        if (job.status === "completed" && job.modelUrl) {
-          setPending3DJobId(null);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.threeDJobId === job.job_id
-                ? {
-                    ...msg,
-                    threeDStatus: "completed" as const,
-                    threeDProgress: 100,
-                    modelUrl: job.modelUrl,
-                  }
-                : msg
-            )
-          );
-          showToast("3D 模型已生成", "success");
-        } else if (job.status === "failed") {
-          setPending3DJobId(null);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.threeDJobId === job.job_id
-                ? {
-                    ...msg,
-                    threeDStatus: "failed" as const,
-                  }
-                : msg
-            )
-          );
-          showToast(job.message || "3D 模型生成失败", "error");
-        }
-      } catch {
-        // Ignore transient polling errors.
-      }
-    }, 4000);
-
-    return () => window.clearInterval(poll);
-  }, [pending3DJobId, showToast]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -790,43 +715,7 @@ export default function ChatInterface({ sessionId, onError }: ChatInterfaceProps
                   </div>
                 )}
 
-                {/* 3D 模型预览 */}
-                {message.modelUrl && (
-                  <div className="mt-4">
-                    <ModelViewer
-                      modelUrl={message.modelUrl}
-                      posterUrl={message.imageUrl}
-                      className="max-w-md"
-                    />
-                  </div>
-                )}
 
-                {/* 3D 模型生成中进度 */}
-                {message.threeDStatus === "processing" && !message.modelUrl && (
-                  <div className="mt-3 rounded-2xl border border-[#C9B99A]/30 bg-gradient-to-r from-[#FAF7F2] to-[#F5F0E8] px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">🧊</span>
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-[#5D4A32]">3D 模型生成中</p>
-                        <p className="text-xs text-[#8A6B46] mt-0.5">预计需要 1-2 分钟，完成后将自动展示</p>
-                        <div className="mt-2 h-1.5 w-full rounded-full bg-[#E8E0D4] overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-[#C9B99A] to-[#A89068] transition-all duration-700 ease-out"
-                            style={{ width: `${Math.max(message.threeDProgress || 5, 5)}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3D 模型生成失败 */}
-                {message.threeDStatus === "failed" && !message.modelUrl && (
-                  <div className="mt-3 rounded-2xl border border-red-200/50 bg-red-50/50 px-4 py-2.5 text-xs text-red-600">
-                    <span className="mr-1">⚠️</span>
-                    3D 模型生成失败，效果图仍可正常查看
-                  </div>
-                )}
 
                 {message.references && message.references.length > 0 && (
                   <div className="mt-3 rounded-2xl border border-secondary/15 bg-surface-2 p-3">
