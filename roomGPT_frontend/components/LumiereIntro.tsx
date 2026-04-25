@@ -37,7 +37,7 @@ export default function LumiereIntro({ onComplete }: LumiereIntroProps) {
         >
           {/* 温暖感背景光晕层（匹配全站色调） */}
           <div className="pointer-events-none absolute inset-0">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 2.5, ease: "easeOut" }}
@@ -54,7 +54,7 @@ export default function LumiereIntro({ onComplete }: LumiereIntroProps) {
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <defs>
-                  <linearGradient id="stroke-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <linearGradient id="lumiere-stroke-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="#A68B5B" />
                     <stop offset="50%" stopColor="#8B6F47" />
                     <stop offset="100%" stopColor="#A68B5B" />
@@ -64,18 +64,19 @@ export default function LumiereIntro({ onComplete }: LumiereIntroProps) {
                   x="50%"
                   y="50%"
                   textAnchor="middle"
-                  dominantBaseline="middle"
+                  dy=".32em"
                   className="font-display"
                   fontSize="140"
                   fontWeight="300"
                   letterSpacing="0.1em"
-                  stroke="url(#stroke-gradient)"
+                  stroke="url(#lumiere-stroke-gradient)"
                   strokeWidth="1.5"
-                  initial={{ strokeDasharray: 800, strokeDashoffset: 800, fill: "rgba(139,111,71,0)" }}
-                  animate={{ strokeDashoffset: 0, fill: "rgba(139,111,71,1)" }}
+                  fill="#8B6F47"
+                  initial={{ strokeDasharray: 2500, strokeDashoffset: 2500, fillOpacity: 0 }}
+                  animate={{ strokeDashoffset: 0, fillOpacity: 1 }}
                   transition={{
                     strokeDashoffset: { duration: 2.2, ease: "easeInOut" },
-                    fill: { duration: 1, delay: 1.8, ease: "easeInOut" }
+                    fillOpacity: { duration: 1, delay: 1.8, ease: "easeInOut" }
                   }}
                 >
                   Lumière
@@ -92,7 +93,7 @@ export default function LumiereIntro({ onComplete }: LumiereIntroProps) {
             >
               AI Interior Designer
             </motion.div>
-            
+
             {/* 质感光泽扫过特效 */}
             <motion.div
               initial={{ left: "-100%", opacity: 0 }}

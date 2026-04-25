@@ -24,7 +24,9 @@ from langchain_core.messages import HumanMessage
 from tools import generate_renovation_rendering_tool
 from db import (
     create_render_job,
-    get_latest_3d_job_for_source_image,
+    delete_session,
+    ensure_session,
+    get_render_job,
     get_messages,
     init_db,
     list_sessions,
@@ -50,7 +52,7 @@ IMAGE_GENERATION_MODE = os.getenv("IMAGE_GENERATION_MODE", "local_mock").strip()
 FRONTEND_PUBLIC_ROOT = Path(os.getenv("FRONTEND_PUBLIC_ROOT", Path(os.getcwd()) / "roomGPT_frontend" / "public"))
 LOCAL_ORIGINAL_DIR = Path(os.getenv("LOCAL_ORIGINAL_DIR", FRONTEND_PUBLIC_ROOT / "local-images" / "original"))
 LOCAL_RENDERED_DIR = Path(os.getenv("LOCAL_RENDERED_DIR", FRONTEND_PUBLIC_ROOT / "local-images" / "rendered"))
-# (Google CSE removed — 搜索功能已迁移到百度千帆 AI 搜索，见 baidu_search.py)
+
 QUICK_GENERATE_USER = "quick_generate_user"
 UPSTREAM_503_MAX_RETRIES = max(0, int(os.getenv("UPSTREAM_503_MAX_RETRIES", "2")))
 UPSTREAM_503_BACKOFF_SECONDS = max(0.2, float(os.getenv("UPSTREAM_503_BACKOFF_SECONDS", "1.0")))
@@ -71,7 +73,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# (ADK runner/artifact_service removed - now using LangGraph graph objects from agent.py)
+
 
 USD_TO_CNY = 7.2
 HEADING_REPLACEMENTS = {

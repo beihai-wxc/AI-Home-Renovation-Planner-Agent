@@ -9,6 +9,8 @@ import LumiereIntro from "../components/LumiereIntro";
 import PairedCarousel, { PairedSlide } from "../components/PairedCarousel";
 import { getCurrentUser } from "../utils/auth";
 
+const INTRO_SEEN_SESSION_KEY = "lumiere-intro-seen";
+
 const pairedSlides: PairedSlide[] = [
   { beforeSrc: "/pic/pic1_before.jpg", afterSrc: "/pic/pic1_after.jpg", beforeAlt: "原始房间示例图 1", afterAlt: "生成后的房间示例图 1" },
   { beforeSrc: "/pic/pic2_before.jpg", afterSrc: "/pic/pic2_after.jpg", beforeAlt: "原始房间示例图 2", afterAlt: "生成后的房间示例图 2" },
@@ -97,10 +99,10 @@ export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    // 检查是否已经播放过开屏动画
-    if (!sessionStorage.getItem("lumiere_intro_seen")) {
+    // 使用 sessionStorage 记录当前标签页是否已播放过，避免模块级变量在路由切换/HMR 下残留状态。
+    const hasSeenIntro = window.sessionStorage.getItem(INTRO_SEEN_SESSION_KEY) === "1";
+    if (!hasSeenIntro) {
       setShowIntro(true);
-      sessionStorage.setItem("lumiere_intro_seen", "true");
     }
 
     const sync = () => setIsLoggedIn(Boolean(getCurrentUser()));
@@ -109,9 +111,14 @@ export default function HomePage() {
     return () => window.removeEventListener("storage", sync);
   }, []);
 
+  const handleIntroComplete = () => {
+    setShowIntro(false);
+    window.sessionStorage.setItem(INTRO_SEEN_SESSION_KEY, "1");
+  };
+
   return (
     <div className="home-background lux-shell relative min-h-screen overflow-x-hidden text-text-primary">
-      {showIntro && <LumiereIntro onComplete={() => setShowIntro(false)} />}
+      {showIntro && <LumiereIntro onComplete={handleIntroComplete} />}
       <Header />
 
       <main className="relative mx-auto w-full max-w-7xl flex-1 px-4 pb-12 pt-28 sm:px-6 lg:px-8">
