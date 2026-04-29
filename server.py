@@ -1071,7 +1071,7 @@ async def generate_floorplan_room_image(
 ) -> tuple[Optional[str], str]:
     prompt = build_floorplan_room_prompt(room_name, room_type, user_message)
     room_key = re.sub(r"[^a-z0-9]+", "_", room_name.lower()) or "room"
-    generated = await generate_image(prompt)
+    generated = await generate_image(prompt, size="2K")
     if not generated:
         raise RuntimeError(f"{room_name} 未返回可用图片结果。")
     if generated.startswith("base64,"):
@@ -1656,8 +1656,8 @@ async def process_floorplan_generation_job(
             update_floorplan_job(job_id, status="generation_processing", result=result)
             update_floorplan_message_snapshot(job_id, "generation_processing", result)
 
-            for start_index in range(0, len(batch), 2):
-                chunk = batch[start_index:start_index + 2]
+            for start_index in range(0, len(batch), 1):
+                chunk = batch[start_index:start_index + 1]
                 tasks = [
                     generate_room_render_for_job(
                         request=request,
@@ -1673,6 +1673,7 @@ async def process_floorplan_generation_job(
                     if target is None:
                         continue
                     if isinstance(rendered_room, Exception):
+                        logger.warning("Floorplan room render failed for %s: %s", target.get("name"), rendered_room)
                         target["generationStatus"] = "failed"
                         target["description"] = f"{target.get('name') or '该房间'}效果图生成失败，可稍后重试。"
                     else:
@@ -1681,6 +1682,9 @@ async def process_floorplan_generation_job(
                     result["generation"]["completedRooms"] = completed_count
                     update_floorplan_job(job_id, status="generation_processing", result=result)
                     update_floorplan_message_snapshot(job_id, "generation_processing", result)
+                # 串行请求间隔，避免限流 429
+                if start_index + 1 < len(batch):
+                    await asyncio.sleep(2.0)
 
         failed_count = sum(1 for room in result["rooms"] if room.get("generationStatus") == "failed")
         result["generation"]["status"] = "completed" if failed_count == 0 else "partial"

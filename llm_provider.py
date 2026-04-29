@@ -175,17 +175,38 @@ async def _generate_image_dashscope_multimodal(
         },
         "parameters": {
             "n": 1,
-            "size": size or "1024*1024",
+            "size": size or "2K",
+            "watermark": False,
         },
     }
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        try:
-            resp = await client.post(endpoint, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception as e:
-            raise RuntimeError(f"DashScope 2.7/2.6 图片生成失败: {e}")
+    import asyncio as _asyncio
+
+    max_retries = 3
+    last_error: Optional[str] = None
+    for attempt in range(max_retries):
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            try:
+                resp = await client.post(endpoint, headers=headers, json=payload)
+                if resp.status_code == 429:
+                    last_error = f"429 rate-limited (attempt {attempt + 1}/{max_retries})"
+                    await _asyncio.sleep(3.0 * (attempt + 1))
+                    continue
+                if resp.status_code >= 400:
+                    body = resp.text
+                    raise RuntimeError(f"DashScope {resp.status_code}: {body}")
+                data = resp.json()
+                break
+            except Exception as e:
+                if isinstance(e, RuntimeError):
+                    raise
+                last_error = str(e)
+                if attempt < max_retries - 1:
+                    await _asyncio.sleep(2.0)
+                    continue
+                raise RuntimeError(f"DashScope 2.7/2.6 图片生成失败: {e}")
+        if attempt == max_retries - 1 and last_error:
+            raise RuntimeError(f"DashScope 图片生成失败（已重试{max_retries}次）: {last_error}")
 
     choices = (data.get("output") or {}).get("choices") or []
     if not choices:
