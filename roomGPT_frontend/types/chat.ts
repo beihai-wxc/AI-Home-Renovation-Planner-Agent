@@ -17,6 +17,41 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   imageUrl?: string;       // 如果有生成的效果图
+  floorplanAnalysis?: {
+    phase?: 'analysis' | 'generation';
+    sourceImageUrl?: string;
+    zoomedFloorplanUrl: string;
+    imageWidth?: number;
+    imageHeight?: number;
+    summary?: string;
+    generation?: {
+      started: boolean;
+      status: 'idle' | 'processing' | 'completed' | 'partial' | 'failed';
+      currentBatch: number;
+      totalBatches: number;
+      completedRooms: number;
+      totalRooms: number;
+    };
+    rooms: Array<{
+      id: string;
+      name: string;
+      roomType?: string;
+      bbox: [number, number, number, number];
+      dimensions?: {
+        length?: string;
+        width?: string;
+        height?: string;
+        unit?: string;
+      };
+      userRequirements?: string;
+      isUserEdited?: boolean;
+      isUserCreated?: boolean;
+      generationStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+      description?: string;
+      designPrompt?: string;
+      imageUrl?: string;
+    }>;
+  };
   references?: Array<{
     title: string;
     url: string;
@@ -26,12 +61,14 @@ export interface ChatMessage {
   followUpPrompts?: string[];
   renderJobId?: string;
   renderStatus?: 'pending' | 'completed' | 'failed';
+  floorplanJobId?: string;
+  floorplanStatus?: 'pending' | 'processing' | 'completed' | 'failed' | 'analysis_completed' | 'generation_pending' | 'generation_processing' | 'generation_completed' | 'generation_failed';
   retryableRender?: boolean;
   attachments?: Array<{
     id: string;
     url: string;
     label: string;
-    kind?: 'general' | 'current_room' | 'inspiration' | 'vision_match';
+    kind?: 'general' | 'current_room' | 'inspiration' | 'vision_match' | 'floorplan';
   }>;
   agentName?: string;     // 来自哪个 Agent (如: VisualAssessor, DesignPlanner, ProjectCoordinator)
   timestamp: Date;

@@ -82,7 +82,6 @@ function buildChatMessage(data: {
   role: "user" | "assistant";
   content: string;
   imageUrl?: string | null;
-
   references?: Array<{
     title: string;
     url: string;
@@ -93,8 +92,45 @@ function buildChatMessage(data: {
     id: string;
     url: string;
     label: string;
-    kind?: "general" | "current_room" | "inspiration" | "vision_match";
+    kind?: "general" | "current_room" | "inspiration" | "vision_match" | "floorplan";
   }>;
+  floorplanJobId?: string | null;
+  floorplanStatus?: ChatMessage["floorplanStatus"] | null;
+  floorplanAnalysis?: {
+    phase?: "analysis" | "generation";
+    sourceImageUrl?: string;
+    zoomedFloorplanUrl: string;
+    imageWidth?: number;
+    imageHeight?: number;
+    summary?: string;
+    generation?: {
+      started: boolean;
+      status: "idle" | "processing" | "completed" | "partial" | "failed";
+      currentBatch: number;
+      totalBatches: number;
+      completedRooms: number;
+      totalRooms: number;
+    };
+    rooms: Array<{
+      id: string;
+      name: string;
+      roomType?: string;
+      bbox: [number, number, number, number];
+      dimensions?: {
+        length?: string;
+        width?: string;
+        height?: string;
+        unit?: string;
+      };
+      userRequirements?: string;
+      isUserEdited?: boolean;
+      isUserCreated?: boolean;
+      generationStatus?: "pending" | "processing" | "completed" | "failed";
+      description?: string;
+      designPrompt?: string;
+      imageUrl?: string;
+    }>;
+  };
   created_at?: string;
 }): ChatMessage {
   return {
@@ -102,9 +138,11 @@ function buildChatMessage(data: {
     role: data.role,
     content: data.content,
     imageUrl: data.imageUrl || undefined,
-
     references: data.references || undefined,
     attachments: data.attachments || undefined,
+    floorplanJobId: data.floorplanJobId || undefined,
+    floorplanStatus: data.floorplanStatus || undefined,
+    floorplanAnalysis: data.floorplanAnalysis || undefined,
     timestamp: data.created_at ? new Date(data.created_at) : new Date(),
   };
 }
@@ -213,12 +251,87 @@ export async function fetchSessionMessages(sessionId: string): Promise<ChatMessa
       role: message.role,
       content: message.content,
       imageUrl: message.imageUrl,
-
       references: message.references,
       attachments: message.attachments,
+      floorplanJobId: message.floorplanJobId,
+      floorplanStatus: message.floorplanStatus,
+      floorplanAnalysis: message.floorplanAnalysis,
       created_at: message.created_at,
     })
   );
+}
+
+export async function requestFloorplanAnalysis(
+  message: string,
+  image: File,
+  sessionId: string
+): Promise<{ job_id: string; status: string; message?: string }> {
+  const userId = resolveUserId();
+  const formData = new FormData();
+  formData.append("message", message);
+  formData.append("image", image);
+  formData.append("user_id", userId);
+  formData.append("session_id", sessionId);
+
+  const response = await fetch(`${API_BASE_URL}/api/floorplan/analyze`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || error.message || "户型图分析失败");
+  }
+
+  return await response.json();
+}
+
+export async function fetchFloorplanJobStatus(jobId: string): Promise<{
+  job_id: string;
+  status: string;
+  message?: string;
+  analysis?: ChatMessage["floorplanAnalysis"];
+}> {
+  const userId = resolveUserId();
+  const response = await fetch(`${API_BASE_URL}/api/floorplan-jobs/${jobId}?user_id=${encodeURIComponent(userId)}`);
+  if (!response.ok) {
+    throw new Error("查询户型图任务状态失败");
+  }
+  return await response.json();
+}
+
+export async function updateFloorplanRooms(
+  jobId: string,
+  rooms: NonNullable<ChatMessage["floorplanAnalysis"]>["rooms"]
+): Promise<{ job_id: string; status: string; message?: string; analysis?: ChatMessage["floorplanAnalysis"] }> {
+  const userId = resolveUserId();
+  const response = await fetch(`${API_BASE_URL}/api/floorplan-jobs/${jobId}/rooms?user_id=${encodeURIComponent(userId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rooms }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || error.message || "保存房间信息失败");
+  }
+  return await response.json();
+}
+
+export async function startFloorplanGeneration(
+  jobId: string,
+  rooms: NonNullable<ChatMessage["floorplanAnalysis"]>["rooms"]
+): Promise<{ job_id: string; status: string; message?: string; analysis?: ChatMessage["floorplanAnalysis"] }> {
+  const userId = resolveUserId();
+  const response = await fetch(`${API_BASE_URL}/api/floorplan-jobs/${jobId}/generate?user_id=${encodeURIComponent(userId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rooms }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || error.message || "启动效果图生成失败");
+  }
+  return await response.json();
 }
 
 export async function sendChatMessage(message: string): Promise<ChatMessage> {

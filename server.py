@@ -1,10 +1,12 @@
 import asyncio
+import base64
 import json
 import logging
 import os
 import re
 import uuid
 from html import unescape
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote, urlencode
 from urllib.request import urlopen
@@ -16,16 +18,19 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from PIL import Image
 from pydantic import BaseModel
 
 from agent import graph, render_graph
-from llm_provider import encode_image_to_base64_message, get_chat_llm
+from llm_provider import encode_image_to_base64_message, generate_image, get_chat_llm, get_vision_llm
 from langchain_core.messages import HumanMessage
 from tools import generate_renovation_rendering_tool
 from db import (
+    create_floorplan_job,
     create_render_job,
     delete_session,
     ensure_session,
+    get_floorplan_job,
     get_render_job,
     get_messages,
     init_db,
@@ -36,6 +41,8 @@ from db import (
     save_message_assets,
     set_session_pinned,
     session_state_snapshot,
+    update_message_metadata,
+    update_floorplan_job,
     update_render_job,
 )
 
@@ -149,6 +156,9 @@ class MessageResponse(BaseModel):
     imageUrl: Optional[str] = None
     attachments: Optional[list[dict[str, str]]] = None
     references: Optional[list[dict[str, str]]] = None
+    floorplanJobId: Optional[str] = None
+    floorplanStatus: Optional[str] = None
+    floorplanAnalysis: Optional[dict[str, Any]] = None
     created_at: str
 
 
@@ -181,6 +191,21 @@ class PromptRecommendationsResponse(BaseModel):
     prompts: list[str]
 
 
+class FloorplanJobResponse(BaseModel):
+    job_id: str
+    status: str
+    message: Optional[str] = None
+    analysis: Optional[dict[str, Any]] = None
+
+
+class FloorplanRoomsUpdateRequest(BaseModel):
+    rooms: list[dict[str, Any]]
+
+
+def default_room_dimensions() -> dict[str, Any]:
+    return {"length": "", "width": "", "height": "", "unit": "m"}
+
+
 def require_api_key() -> None:
     if "LLM_API_KEY" not in os.environ:
         raise HTTPException(
@@ -201,6 +226,334 @@ def build_asset_url(request: Request, session_id: str, filename: str, user_id: s
             filename=filename,
         ).include_query_params(user_id=user_id)
     )
+
+
+def build_local_asset_url(
+    request: Request,
+    *,
+    image_filename: Optional[str] = None,
+    image_kind: str = "rendered",
+    image_path: Optional[str] = None,
+) -> Optional[str]:
+    if image_kind == "library" and image_path:
+        return str(request.url_for("local_library_asset", library_path=quote(image_path)))
+    if image_filename:
+        return str(request.url_for("local_file_asset", kind="rendered", filename=quote(image_filename)))
+    return None
+
+
+def normalize_floorplan_room_name(name: str, fallback_index: int) -> str:
+    text = re.sub(r"\s+", "", (name or "").strip())
+    if not text:
+        return f"空间{fallback_index}"
+    aliases = {
+        "客餐厅": "客厅",
+        "起居室": "客厅",
+        "主卧室": "主卧",
+        "次卧室": "次卧",
+        "卧房": "卧室",
+        "厨房间": "厨房",
+        "洗手间": "卫生间",
+        "浴室": "卫生间",
+    }
+    return aliases.get(text, text)
+
+
+def infer_room_type(room_name: str) -> str:
+    text = room_name or ""
+    if "主卧" in text:
+        return "卧室"
+    if "次卧" in text:
+        return "卧室"
+    if "卧" in text:
+        return "卧室"
+    if "客" in text or "厅" in text:
+        return "客厅"
+    if "厨" in text:
+        return "厨房"
+    if "卫" in text or "浴" in text:
+        return "卫生间"
+    if "书" in text:
+        return "书房"
+    if "餐" in text:
+        return "餐厅"
+    if "阳台" in text:
+        return "阳台"
+    return "空间"
+
+
+def floorplan_generation_priority(room_type: str) -> tuple[int, int]:
+    priority_groups = {
+        "客厅": 0,
+        "卧室": 1,
+        "书房": 1,
+        "儿童房": 1,
+        "厨房": 2,
+        "餐厅": 2,
+        "阳台": 3,
+        "卫生间": 3,
+        "玄关": 3,
+    }
+    return (priority_groups.get(room_type, 4), 0)
+
+
+def build_room_record(
+    *,
+    room_id: str,
+    room_name: str,
+    room_type: str,
+    bbox: list[int],
+    user_requirements: str = "",
+    is_user_created: bool = False,
+) -> dict[str, Any]:
+    return {
+        "id": room_id,
+        "name": room_name,
+        "roomType": room_type,
+        "bbox": bbox,
+        "dimensions": default_room_dimensions(),
+        "userRequirements": user_requirements,
+        "isUserEdited": False,
+        "isUserCreated": is_user_created,
+        "generationStatus": "pending",
+        "imageUrl": None,
+        "description": None,
+        "designPrompt": None,
+    }
+
+
+def sanitize_room_entry(room: dict[str, Any], fallback_index: int) -> dict[str, Any]:
+    bbox = room.get("bbox") or [0, 0, 100, 100]
+    try:
+        x1, y1, x2, y2 = [max(0, min(1000, int(float(value)))) for value in bbox[:4]]
+    except (TypeError, ValueError):
+        x1, y1, x2, y2 = 0, 0, 100, 100
+    if x2 <= x1:
+        x2 = min(1000, x1 + 100)
+    if y2 <= y1:
+        y2 = min(1000, y1 + 100)
+    room_name = normalize_floorplan_room_name(str(room.get("name") or ""), fallback_index)
+    room_type = normalize_room_label(str(room.get("roomType") or infer_room_type(room_name)))
+    dimensions = room.get("dimensions") if isinstance(room.get("dimensions"), dict) else {}
+    return {
+        "id": str(room.get("id") or f"room-{fallback_index}"),
+        "name": room_name,
+        "roomType": room_type,
+        "bbox": [x1, y1, x2, y2],
+        "dimensions": {
+            "length": str(dimensions.get("length") or ""),
+            "width": str(dimensions.get("width") or ""),
+            "height": str(dimensions.get("height") or ""),
+            "unit": str(dimensions.get("unit") or "m"),
+        },
+        "userRequirements": str(room.get("userRequirements") or ""),
+        "isUserEdited": bool(room.get("isUserEdited") or False),
+        "isUserCreated": bool(room.get("isUserCreated") or False),
+        "generationStatus": str(room.get("generationStatus") or "pending"),
+        "imageUrl": room.get("imageUrl"),
+        "description": room.get("description"),
+        "designPrompt": room.get("designPrompt"),
+    }
+
+
+def sanitize_floorplan_result_rooms(rooms: Any) -> list[dict[str, Any]]:
+    if not isinstance(rooms, list):
+        return []
+    return [sanitize_room_entry(room, idx) for idx, room in enumerate(rooms, start=1) if isinstance(room, dict)]
+
+
+def fallback_floorplan_rooms() -> list[dict[str, Any]]:
+    return [
+        {"name": "客厅", "bbox": [80, 80, 540, 420]},
+        {"name": "主卧", "bbox": [580, 80, 920, 360]},
+        {"name": "次卧", "bbox": [580, 400, 920, 720]},
+        {"name": "厨房", "bbox": [80, 460, 360, 760]},
+    ]
+
+
+def sanitize_floorplan_rooms(rooms: Any) -> list[dict[str, Any]]:
+    if not isinstance(rooms, list):
+        rooms = []
+    sanitized: list[dict[str, Any]] = []
+    for idx, room in enumerate(rooms, start=1):
+        if not isinstance(room, dict):
+            continue
+        raw_bbox = room.get("bbox") or room.get("box") or room.get("rect") or []
+        if not isinstance(raw_bbox, list) or len(raw_bbox) != 4:
+            continue
+        try:
+            x1, y1, x2, y2 = [max(0, min(1000, int(float(value)))) for value in raw_bbox]
+        except (TypeError, ValueError):
+            continue
+        if x2 <= x1 or y2 <= y1:
+            continue
+        sanitized.append(
+            {
+                "name": normalize_floorplan_room_name(str(room.get("name") or room.get("room_name") or ""), idx),
+                "bbox": [x1, y1, x2, y2],
+            }
+        )
+    return sanitized[:8]
+
+
+async def detect_floorplan_rooms(
+    *,
+    image_data: bytes,
+    mime_type: str,
+    user_message: str,
+) -> list[dict[str, Any]]:
+    prompt = (
+        "请识别这张中文住宅户型图中的主要房间，并仅输出 JSON。"
+        "返回格式必须是 {\"rooms\":[{\"name\":\"客厅\",\"bbox\":[x1,y1,x2,y2]}]}。"
+        "bbox 使用 0-1000 的归一化坐标，覆盖房间主体区域。"
+        "只保留主要空间，最多 8 个。"
+        f"用户需求：{user_message or '未提供额外要求'}。"
+    )
+    try:
+        llm = get_vision_llm(temperature=0.1)
+        response = await llm.ainvoke(
+            [
+                HumanMessage(
+                    content=[
+                        {"type": "text", "text": prompt},
+                        encode_image_to_base64_message(image_data, mime_type or "image/png"),
+                    ]
+                )
+            ]
+        )
+        content = response.content if isinstance(response.content, str) else json.dumps(response.content, ensure_ascii=False)
+        match = re.search(r"\{.*\}", content, flags=re.S)
+        if not match:
+            raise ValueError("No JSON payload in floorplan response.")
+        payload = json.loads(match.group(0))
+        rooms = sanitize_floorplan_rooms(payload.get("rooms"))
+        if rooms:
+            return rooms
+    except Exception as exc:
+        logger.warning("Floorplan room detection fallback triggered: %s", exc)
+    return fallback_floorplan_rooms()
+
+
+def save_base64_generated_image(*, session_id: str, user_id: str, room_key: str, payload: str) -> str:
+    b64_data = payload.split("base64,", 1)[-1]
+    image_bytes = base64.b64decode(b64_data)
+    filename = f"floorplan_room_{room_key}_{uuid.uuid4().hex[:8]}.png"
+    filepath = os.path.join(ARTIFACT_ROOT, filename)
+    with open(filepath, "wb") as f:
+        f.write(image_bytes)
+    save_asset(
+        session_id=session_id,
+        user_id=user_id,
+        filename=filename,
+        asset_type="floorplan_generated",
+        version=1,
+        metadata={"room_key": room_key},
+    )
+    return filename
+
+
+def save_remote_generated_image(
+    *,
+    session_id: str,
+    user_id: str,
+    room_key: str,
+    image_url: str,
+) -> str:
+    with urlopen(image_url) as response:
+        image_bytes = response.read()
+        content_type = response.headers.get("Content-Type", "").lower()
+
+    extension = ".png"
+    if "jpeg" in content_type or "jpg" in content_type:
+        extension = ".jpg"
+    elif "webp" in content_type:
+        extension = ".webp"
+    else:
+        url_path = Path(image_url.split("?", 1)[0])
+        suffix = url_path.suffix.lower()
+        if suffix in {".png", ".jpg", ".jpeg", ".webp"}:
+            extension = suffix
+
+    filename = f"floorplan_room_{room_key}_{uuid.uuid4().hex[:8]}{extension}"
+    filepath = os.path.join(ARTIFACT_ROOT, filename)
+    with open(filepath, "wb") as f:
+        f.write(image_bytes)
+
+    save_asset(
+        session_id=session_id,
+        user_id=user_id,
+        filename=filename,
+        asset_type="floorplan_generated",
+        version=1,
+        metadata={"room_key": room_key, "source_url": image_url},
+    )
+    return filename
+
+
+def build_floorplan_room_prompt(room_name: str, room_type: str, user_message: str) -> str:
+    base = user_message.strip() or "请生成适合家庭居住的现代温馨装修效果图。"
+    return (
+        f"请为{room_name}生成装修效果图。"
+        f"该空间类型是{room_type}。"
+        "请保持真实住宅视角、空间尺度合理、软装完整、光线自然。"
+        f"重点满足这些要求：{base}"
+    )
+
+
+def extract_style_hint_from_text(text: str) -> str:
+    content = (text or "").strip()
+    if not content:
+        return "现代温馨"
+    style_keywords = [
+        "现代简约", "现代风", "奶油风", "原木风", "北欧风", "现代北欧",
+        "侘寂风", "法式", "中古风", "轻奢", "极简", "新中式", "日式",
+    ]
+    for keyword in style_keywords:
+        if keyword in content:
+            return keyword
+    return "现代温馨"
+
+
+def build_floorplan_room_description(room_name: str, room_type: str, user_message: str) -> str:
+    style_hint = extract_style_hint_from_text(user_message)
+    focus_map = {
+        "客厅": "强调会客氛围与通透感",
+        "卧室": "强调睡眠氛围与舒适度",
+        "厨房": "强调操作动线与收纳效率",
+        "卫生间": "强调干净利落与易清洁",
+        "书房": "强调安静专注与收纳秩序",
+        "餐厅": "强调用餐氛围与灯光层次",
+        "阳台": "强调休闲放松与采光利用",
+        "空间": "强调整体协调与实用性",
+    }
+    focus = focus_map.get(room_type, focus_map["空间"])
+    return f"整体采用{style_hint}取向，{focus}，更贴合{room_name}的日常使用。"
+
+
+async def build_floorplan_zoom_asset(
+    *,
+    session_id: str,
+    user_id: str,
+    source_path: str,
+) -> tuple[str, int, int]:
+    with Image.open(source_path) as img:
+        converted = img.convert("RGB")
+        width, height = converted.size
+        zoom_width = max(width * 2, 1200)
+        zoom_height = max(height * 2, 1200)
+        resized = converted.resize((zoom_width, zoom_height))
+        filename = f"floorplan_zoom_{uuid.uuid4().hex[:8]}.png"
+        filepath = os.path.join(ARTIFACT_ROOT, filename)
+        resized.save(filepath, format="PNG")
+    save_asset(
+        session_id=session_id,
+        user_id=user_id,
+        filename=filename,
+        asset_type="floorplan_zoom",
+        version=1,
+        metadata={"source": Path(source_path).name},
+    )
+    return filename, zoom_width, zoom_height
 
 
 async def save_uploaded_asset(
@@ -418,6 +771,324 @@ def strip_html(text: str) -> str:
     cleaned = re.sub(r"<[^>]+>", "", text)
     return re.sub(r"\s+", " ", unescape(cleaned)).strip()
 
+def find_existing_file_by_stem(directory: Path, stem: str) -> Optional[Path]:
+    if not directory.exists():
+        return None
+    patterns = [f"{stem}.png", f"{stem}.jpg", f"{stem}.jpeg", f"{stem}.webp"]
+    for name in patterns:
+        candidate = directory / name
+        if candidate.exists():
+            return candidate
+    for candidate in directory.iterdir():
+        if candidate.is_file() and candidate.stem.lower() == stem.lower():
+            return candidate
+    return None
+
+
+def find_existing_file_by_name(directory: Path, filename: str) -> Optional[Path]:
+    if not directory.exists():
+        return None
+    target = filename.strip()
+    if not target:
+        return None
+    exact = directory / target
+    if exact.exists() and exact.is_file():
+        return exact
+    lowered = target.lower()
+    for candidate in directory.iterdir():
+        if candidate.is_file() and candidate.name.lower() == lowered:
+            return candidate
+    return None
+
+
+def find_matching_file_by_stems(directory: Path, stems: list[str]) -> Optional[Path]:
+    if not directory.exists():
+        return None
+
+    normalized_stems = [stem.strip() for stem in stems if stem and stem.strip()]
+    if not normalized_stems:
+        return None
+
+    for stem in normalized_stems:
+        matched = find_existing_file_by_stem(directory, stem)
+        if matched:
+            return matched
+
+    lowered_stems = [stem.lower() for stem in normalized_stems]
+    for candidate in directory.iterdir():
+        if not candidate.is_file():
+            continue
+        candidate_stem = candidate.stem.lower()
+        if any(candidate_stem.startswith(stem) for stem in lowered_stems):
+            return candidate
+    return None
+
+
+def resolve_local_image_dirs() -> tuple[Path, Path]:
+    original_dir = LOCAL_ORIGINAL_DIR
+    rendered_dir = LOCAL_RENDERED_DIR
+    if original_dir.exists() and rendered_dir.exists():
+        return original_dir, rendered_dir
+
+    search_roots: list[Path] = []
+    if FRONTEND_PUBLIC_ROOT.exists():
+        search_roots.append(FRONTEND_PUBLIC_ROOT)
+    search_roots.append(Path(os.getcwd()))
+
+    def scan_dirs(root: Path) -> list[Path]:
+        found: list[Path] = []
+        try:
+            for path in root.rglob("*"):
+                if path.is_dir():
+                    found.append(path)
+        except Exception:
+            return found
+        return found
+
+    all_dirs: list[Path] = []
+    for root in search_roots:
+        all_dirs.extend(scan_dirs(root))
+
+    def find_dir(keyword: str) -> Optional[Path]:
+        for folder in all_dirs:
+            if keyword in folder.name:
+                return folder
+        return None
+
+    original_fallback = find_dir("原始")
+    rendered_fallback = find_dir("渲染")
+    return original_fallback or original_dir, rendered_fallback or rendered_dir
+
+
+def get_local_library_roots() -> list[Path]:
+    roots: list[Path] = []
+    for root in [Path(os.getcwd()), FRONTEND_PUBLIC_ROOT]:
+        resolved = root.resolve()
+        if resolved not in roots:
+            roots.append(resolved)
+    return roots
+
+
+def relative_local_library_path(file_path: Path) -> Optional[str]:
+    resolved = file_path.resolve()
+    for root in get_local_library_roots():
+        try:
+            return resolved.relative_to(root).as_posix()
+        except ValueError:
+            continue
+    return None
+
+
+def normalize_style_label(style: str) -> str:
+    aliases = {
+        "简约风": "极简风",
+        "极简风": "极简风",
+        "modern": "现代风",
+        "现代风": "现代风",
+        "现代北欧风": "现代北欧风",
+        "vintage": "复古风",
+        "复古风": "复古风",
+        "professional": "商务风",
+        "商务风": "商务风",
+        "tropical": "热带风",
+        "热带风": "热带风",
+    }
+    key = (style or "").strip()
+    return aliases.get(key.lower(), aliases.get(key, key))
+
+
+def normalize_room_label(room: str) -> str:
+    aliases = {
+        "living room": "客厅",
+        "客厅": "客厅",
+        "bedroom": "卧室",
+        "卧室": "卧室",
+        "房间": "卧室",
+    }
+    key = (room or "").strip()
+    return aliases.get(key.lower(), aliases.get(key, key))
+
+
+def resolve_room_library_dir(room: str) -> Optional[Path]:
+    normalized_room = normalize_room_label(room)
+    if not normalized_room:
+        return None
+
+    for root in get_local_library_roots():
+        try:
+            for candidate in root.iterdir():
+                if (
+                    candidate.is_dir()
+                    and candidate.name.startswith("一转五风格_")
+                    and normalized_room in candidate.name
+                ):
+                    return candidate
+        except FileNotFoundError:
+            continue
+    return None
+
+
+def find_default_room_render_file(directory: Path) -> Optional[Path]:
+    if not directory.exists():
+        return None
+
+    preferred_keywords = ["现代风", "现代北欧风", "简约风", "极简风"]
+    files = [candidate for candidate in directory.iterdir() if candidate.is_file()]
+    if not files:
+        return None
+
+    for keyword in preferred_keywords:
+        for candidate in files:
+            stem = candidate.stem.strip()
+            if keyword in stem and "原图" not in stem:
+                return candidate
+
+    for candidate in files:
+        stem = candidate.stem.strip()
+        if "原图" in stem:
+            continue
+        return candidate
+
+    return None
+
+
+def extract_render_index_from_filename(filename: str) -> Optional[str]:
+    stem = Path(filename or "").stem.strip()
+    if not stem:
+        return None
+
+    b_match = re.search(r"(?i)B(\d+)", stem)
+    if b_match:
+        return b_match.group(1)
+
+    trailing_digit_match = re.search(r"(\d)$", stem)
+    if trailing_digit_match:
+        return trailing_digit_match.group(1)
+
+    return None
+
+
+def resolve_local_render_mapping(
+    *,
+    original_filename: Optional[str],
+    style: Optional[str],
+    room: Optional[str] = None,
+) -> dict[str, Optional[str]]:
+    style = (style or "").strip()
+    original_filename = (original_filename or "").strip()
+    normalized_style = normalize_style_label(style)
+    normalized_room = normalize_room_label(room or "")
+    default_style_map = {
+        "简约风": "简约风",
+        "极简风": "简约风",
+        "现代北欧风": "现代北欧风",
+        "现代风": "现代北欧风",
+    }
+
+    original_dir, rendered_dir = resolve_local_image_dirs()
+
+    if original_filename:
+        stem = Path(original_filename).stem
+        render_index = extract_render_index_from_filename(original_filename)
+        if render_index:
+            mapped_stem = f"A{render_index}"
+            rendered = find_existing_file_by_stem(rendered_dir, mapped_stem)
+            original = find_existing_file_by_name(original_dir, Path(original_filename).name)
+            if not original:
+                original = find_matching_file_by_stems(original_dir, [stem, f"B{render_index}"])
+            if not rendered:
+                return {"image_url": None, "message": f"未找到与 {stem} 对应的渲染图（期望 {mapped_stem}）。"}
+            return {
+                "image_filename": rendered.name,
+                "image_kind": "rendered",
+                "original_filename": original.name if original else None,
+                "original_kind": "original" if original else None,
+                "message": None,
+            }
+
+    if normalized_room:
+        room_dir = resolve_room_library_dir(normalized_room)
+        if room_dir:
+            rendered = find_matching_file_by_stems(room_dir, [normalized_style, style])
+            original = find_matching_file_by_stems(
+                room_dir,
+                [normalized_room, "原图", "原图1"],
+            )
+            if not rendered:
+                rendered = find_default_room_render_file(room_dir)
+            if rendered:
+                return {
+                    "image_filename": rendered.name,
+                    "image_kind": "library",
+                    "image_path": relative_local_library_path(rendered),
+                    "original_filename": original.name if original else None,
+                    "original_kind": "library" if original else None,
+                    "original_path": relative_local_library_path(original) if original else None,
+                    "message": None,
+                }
+
+    style_key = default_style_map.get(normalized_style) or default_style_map.get(style)
+    if not style_key:
+        if normalized_room:
+            return {
+                "image_url": None,
+                "message": "图片生成失败",
+            }
+        return {"image_url": None, "message": "当前无图直生仅支持简约风、现代北欧风。"}
+    rendered = find_existing_file_by_stem(rendered_dir, style_key)
+    if not rendered:
+        return {"image_url": None, "message": f"未找到风格示例图：{style_key}。"}
+    return {
+        "image_filename": rendered.name,
+        "image_kind": "rendered",
+        "original_filename": None,
+        "original_kind": None,
+        "message": None,
+    }
+
+
+def extract_style_from_message(message: str) -> str:
+    text = (message or "").strip()
+    if not text:
+        return ""
+    if "现代北欧风" in text:
+        return "现代北欧风"
+    if "简约风" in text:
+        return "简约风"
+    if "现代风" in text:
+        return "现代风"
+    return ""
+
+
+async def generate_floorplan_room_image(
+    *,
+    request: Request,
+    session_id: str,
+    user_id: str,
+    room_name: str,
+    room_type: str,
+    user_message: str,
+) -> tuple[Optional[str], str]:
+    prompt = build_floorplan_room_prompt(room_name, room_type, user_message)
+    room_key = re.sub(r"[^a-z0-9]+", "_", room_name.lower()) or "room"
+    generated = await generate_image(prompt)
+    if not generated:
+        raise RuntimeError(f"{room_name} 未返回可用图片结果。")
+    if generated.startswith("base64,"):
+        filename = save_base64_generated_image(
+            session_id=session_id,
+            user_id=user_id,
+            room_key=room_key,
+            payload=generated,
+        )
+        return build_asset_url(request, session_id, filename, user_id), prompt
+    filename = save_remote_generated_image(
+        session_id=session_id,
+        user_id=user_id,
+        room_key=room_key,
+        image_url=generated,
+    )
+    return build_asset_url(request, session_id, filename, user_id), prompt
 
 async def web_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
     """统一搜索入口 — 使用百度千帆 AI 搜索 API"""
@@ -768,7 +1439,265 @@ def persist_chat_records(
         role="assistant",
         content=assistant_message,
         image_filename=result_filename,
+        metadata={"references": references or []} if references else None,
     )
+
+
+async def queue_floorplan_job(
+    *,
+    request: Request,
+    user_id: str,
+    session_id: str,
+    request_message: str,
+    source_image: str,
+) -> str:
+    job_id = uuid.uuid4().hex
+    create_floorplan_job(
+        job_id=job_id,
+        session_id=session_id,
+        user_id=user_id,
+        request_message=request_message,
+        source_image=source_image,
+    )
+    asyncio.create_task(
+        process_floorplan_job(
+            request=request,
+            job_id=job_id,
+            user_id=user_id,
+            session_id=session_id,
+            request_message=request_message,
+            source_image=source_image,
+        )
+    )
+    return job_id
+
+
+async def process_floorplan_job(
+    *,
+    request: Request,
+    job_id: str,
+    user_id: str,
+    session_id: str,
+    request_message: str,
+    source_image: str,
+) -> None:
+    source_path = os.path.join(ARTIFACT_ROOT, source_image)
+    try:
+        if not os.path.exists(source_path):
+            raise FileNotFoundError(f"户型图文件不存在: {source_image}")
+
+        with open(source_path, "rb") as f:
+            image_data = f.read()
+
+        zoom_filename, zoom_width, zoom_height = await build_floorplan_zoom_asset(
+            session_id=session_id,
+            user_id=user_id,
+            source_path=source_path,
+        )
+        mime_type = "image/png"
+        suffix = Path(source_image).suffix.lower()
+        if suffix in {".jpg", ".jpeg"}:
+            mime_type = "image/jpeg"
+        elif suffix == ".webp":
+            mime_type = "image/webp"
+
+        rooms = await detect_floorplan_rooms(
+            image_data=image_data,
+            mime_type=mime_type,
+            user_message=request_message,
+        )
+
+        room_results: list[dict[str, Any]] = []
+        for idx, room in enumerate(rooms, start=1):
+            room_name = normalize_floorplan_room_name(room.get("name") or "", idx)
+            room_type = infer_room_type(room_name)
+            room_results.append(
+                build_room_record(
+                    room_id=f"room-{idx}",
+                    room_name=room_name,
+                    room_type=room_type,
+                    bbox=room.get("bbox"),
+                    user_requirements="",
+                )
+            )
+
+        analysis = {
+            "phase": "analysis",
+            "sourceImageUrl": build_asset_url(request, session_id, source_image, user_id),
+            "zoomedFloorplanUrl": build_asset_url(request, session_id, zoom_filename, user_id),
+            "imageWidth": zoom_width,
+            "imageHeight": zoom_height,
+            "rooms": room_results,
+            "summary": f"已识别 {len(room_results)} 个空间，请先校对房间信息，确认后再开始分批生成效果图。",
+            "generation": {
+                "started": False,
+                "status": "idle",
+                "currentBatch": 0,
+                "totalBatches": 4,
+                "completedRooms": 0,
+                "totalRooms": len(room_results),
+            },
+        }
+
+        message_id = save_message(
+            session_id=session_id,
+            user_id=user_id,
+            role="assistant",
+            content=analysis["summary"],
+            metadata={"floorplanAnalysis": analysis},
+        )
+        analysis["messageId"] = message_id
+        update_floorplan_job(job_id, status="analysis_completed", result=analysis)
+    except Exception as exc:
+        logger.error("Floorplan job failed: %s", exc)
+        update_floorplan_job(job_id, status="failed", error_message=f"户型图分析失败：{exc}")
+        save_message(
+            session_id=session_id,
+            user_id=user_id,
+            role="assistant",
+            content=f"户型图分析失败：{exc}",
+        )
+
+
+def update_floorplan_message_snapshot(job_id: str, job_status: str, job_result: dict[str, Any]) -> None:
+    message_id = job_result.get("messageId")
+    if not message_id:
+        return
+    summary = (job_result.get("summary") or "户型图任务已更新。").strip()
+    update_message_metadata(
+        message_id=int(message_id),
+        content=summary,
+        metadata={
+            "floorplanJobId": job_id,
+            "floorplanStatus": job_status,
+            "floorplanAnalysis": job_result,
+        },
+    )
+
+
+def build_generation_batches(rooms: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    sorted_rooms = sorted(
+        rooms,
+        key=lambda item: (floorplan_generation_priority(str(item.get("roomType") or ""))[0], str(item.get("id") or "")),
+    )
+    batches: dict[int, list[dict[str, Any]]] = {}
+    for room in sorted_rooms:
+        group = floorplan_generation_priority(str(room.get("roomType") or ""))[0]
+        batches.setdefault(group, []).append(room)
+    return [batch for _, batch in sorted(batches.items(), key=lambda item: item[0])]
+
+
+async def generate_room_render_for_job(
+    *,
+    request: Request,
+    session_id: str,
+    user_id: str,
+    room: dict[str, Any],
+) -> dict[str, Any]:
+    room_name = room.get("name") or "空间"
+    room_type = room.get("roomType") or infer_room_type(room_name)
+    requirements = room.get("userRequirements") or ""
+    image_url, prompt = await generate_floorplan_room_image(
+        request=request,
+        session_id=session_id,
+        user_id=user_id,
+        room_name=room_name,
+        room_type=room_type,
+        user_message=requirements or f"请为{room_name}生成符合其用途的装修效果图。",
+    )
+    return {
+        **room,
+        "generationStatus": "completed",
+        "imageUrl": image_url,
+        "designPrompt": prompt,
+        "description": build_floorplan_room_description(room_name, room_type, requirements),
+    }
+
+
+async def process_floorplan_generation_job(
+    *,
+    request: Request,
+    job_id: str,
+    user_id: str,
+) -> None:
+    job = get_floorplan_job(job_id, user_id=user_id)
+    if not job:
+        return
+    result = job.get("result") or {}
+    rooms = sanitize_floorplan_result_rooms(result.get("rooms"))
+    try:
+        batches = build_generation_batches(rooms)
+        result["phase"] = "generation"
+        result["generation"] = {
+            "started": True,
+            "status": "processing",
+            "currentBatch": 0,
+            "totalBatches": len(batches),
+            "completedRooms": 0,
+            "totalRooms": len(rooms),
+        }
+        for room in rooms:
+            room["generationStatus"] = "pending"
+            room["imageUrl"] = None
+            room["description"] = None
+            room["designPrompt"] = None
+        result["rooms"] = rooms
+        result["summary"] = "效果图生成已开始，系统会按房间优先级分批返回结果。"
+        update_floorplan_job(job_id, status="generation_processing", result=result)
+        update_floorplan_message_snapshot(job_id, "generation_processing", result)
+
+        completed_count = 0
+        for batch_index, batch in enumerate(batches, start=1):
+            batch_ids = {room["id"] for room in batch}
+            for room in result["rooms"]:
+                if room["id"] in batch_ids and room.get("generationStatus") == "pending":
+                    room["generationStatus"] = "processing"
+            result["generation"]["currentBatch"] = batch_index
+            update_floorplan_job(job_id, status="generation_processing", result=result)
+            update_floorplan_message_snapshot(job_id, "generation_processing", result)
+
+            for start_index in range(0, len(batch), 2):
+                chunk = batch[start_index:start_index + 2]
+                tasks = [
+                    generate_room_render_for_job(
+                        request=request,
+                        session_id=job["session_id"],
+                        user_id=user_id,
+                        room=room,
+                    )
+                    for room in chunk
+                ]
+                chunk_results = await asyncio.gather(*tasks, return_exceptions=True)
+                for original_room, rendered_room in zip(chunk, chunk_results):
+                    target = next((room for room in result["rooms"] if room["id"] == original_room["id"]), None)
+                    if target is None:
+                        continue
+                    if isinstance(rendered_room, Exception):
+                        target["generationStatus"] = "failed"
+                        target["description"] = f"{target.get('name') or '该房间'}效果图生成失败，可稍后重试。"
+                    else:
+                        target.update(rendered_room)
+                        completed_count += 1
+                    result["generation"]["completedRooms"] = completed_count
+                    update_floorplan_job(job_id, status="generation_processing", result=result)
+                    update_floorplan_message_snapshot(job_id, "generation_processing", result)
+
+        failed_count = sum(1 for room in result["rooms"] if room.get("generationStatus") == "failed")
+        result["generation"]["status"] = "completed" if failed_count == 0 else "partial"
+        result["summary"] = (
+            f"效果图已完成 {completed_count}/{len(result['rooms'])} 个房间。"
+            if failed_count
+            else f"效果图已全部生成完成，共 {len(result['rooms'])} 个房间。"
+        )
+        update_floorplan_job(job_id, status="generation_completed", result=result)
+        update_floorplan_message_snapshot(job_id, "generation_completed", result)
+    except Exception as exc:
+        logger.error("Floorplan generation failed: %s", exc)
+        result["generation"] = result.get("generation") or {}
+        result["generation"]["status"] = "failed"
+        result["summary"] = f"效果图生成失败：{exc}"
+        update_floorplan_job(job_id, status="generation_failed", result=result, error_message=f"效果图生成失败：{exc}")
+        update_floorplan_message_snapshot(job_id, "generation_failed", result)
 
 
 # (ADK iter_agent_updates removed)
@@ -900,6 +1829,104 @@ async def quick_generate_endpoint(
     raise HTTPException(status_code=500, detail=f"图片生成失败: {res_msg}")
 
 
+@app.post("/api/floorplan/analyze", response_model=FloorplanJobResponse)
+async def create_floorplan_analysis_endpoint(
+    request: Request,
+    image: UploadFile = File(...),
+    message: str = Form("请按我的要求分析户型图并为每个房间生成效果图。"),
+    user_id: str = Form(DEFAULT_USER),
+    session_id: str = Form(DEFAULT_SESSION),
+):
+    require_api_key()
+    ensure_session(session_id=session_id, user_id=user_id, title=message[:80] or "户型图分析")
+
+    artifact_filename, _, _ = await save_uploaded_asset(
+        file=image,
+        asset_type="floorplan",
+        user_id=user_id,
+        session_id=session_id,
+    )
+    user_message_id = save_message(
+        session_id=session_id,
+        user_id=user_id,
+        role="user",
+        content=message,
+    )
+    save_message_assets(
+        message_id=user_message_id,
+        session_id=session_id,
+        user_id=user_id,
+        attachments=[
+            {
+                "filename": artifact_filename,
+                "asset_type": "floorplan",
+                "label": "户型图",
+            }
+        ],
+    )
+
+    job_id = await queue_floorplan_job(
+        request=request,
+        user_id=user_id,
+        session_id=session_id,
+        request_message=message,
+        source_image=artifact_filename,
+    )
+    return FloorplanJobResponse(job_id=job_id, status="analyzing", message="户型图已上传，正在分析房间结构，完成后可先校对再生成效果图。")
+
+
+@app.get("/api/floorplan-jobs/{job_id}", response_model=FloorplanJobResponse)
+async def get_floorplan_job_endpoint(job_id: str, user_id: str = DEFAULT_USER):
+    job = get_floorplan_job(job_id, user_id=user_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Floorplan job not found.")
+    return FloorplanJobResponse(
+        job_id=job["job_id"],
+        status=job["status"],
+        message=job.get("error_message"),
+        analysis=job.get("result") or None,
+    )
+
+
+@app.post("/api/floorplan-jobs/{job_id}/rooms", response_model=FloorplanJobResponse)
+async def update_floorplan_rooms_endpoint(job_id: str, payload: FloorplanRoomsUpdateRequest, user_id: str = DEFAULT_USER):
+    job = get_floorplan_job(job_id, user_id=user_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Floorplan job not found.")
+    result = job.get("result") or {}
+    result["rooms"] = sanitize_floorplan_result_rooms(payload.rooms)
+    result["phase"] = "analysis"
+    result["summary"] = f"已更新 {len(result['rooms'])} 个房间，请确认后开始生成效果图。"
+    update_floorplan_job(job_id, status="analysis_completed", result=result)
+    update_floorplan_message_snapshot(job_id, "analysis_completed", result)
+    return FloorplanJobResponse(job_id=job_id, status="analysis_completed", message="房间信息已更新。", analysis=result)
+
+
+@app.post("/api/floorplan-jobs/{job_id}/generate", response_model=FloorplanJobResponse)
+async def start_floorplan_generation_endpoint(request: Request, job_id: str, payload: FloorplanRoomsUpdateRequest, user_id: str = DEFAULT_USER):
+    require_api_key()
+    job = get_floorplan_job(job_id, user_id=user_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Floorplan job not found.")
+    result = job.get("result") or {}
+    rooms = sanitize_floorplan_result_rooms(payload.rooms)
+    if not rooms:
+        raise HTTPException(status_code=400, detail="没有可生成的房间数据。")
+    result["rooms"] = rooms
+    result["phase"] = "generation"
+    result["summary"] = "效果图生成即将开始。"
+    update_floorplan_job(job_id, status="generation_pending", result=result)
+    update_floorplan_message_snapshot(job_id, "generation_pending", result)
+    asyncio.create_task(
+        process_floorplan_generation_job(
+            request=request,
+            job_id=job_id,
+            user_id=user_id,
+        )
+    )
+    return FloorplanJobResponse(job_id=job_id, status="generation_pending", message="已开始分批生成效果图。", analysis=result)
+
+
 @app.get("/api/local-files/{kind}/{filename:path}", name="local_file_asset")
 async def local_file_asset(kind: str, filename: str):
     original_dir, rendered_dir = resolve_local_image_dirs()
@@ -986,13 +2013,21 @@ async def get_session_messages(request: Request, session_id: str, user_id: str =
                         "id": f"{message['id']}-{idx}",
                         "url": build_asset_url(request, session_id, item["filename"], user_id),
                         "label": item.get("label")
-                        or ("原图" if item.get("asset_type") == "current_room" else "灵感图" if item.get("asset_type") == "inspiration" else "图片"),
+                        or (
+                            "原图" if item.get("asset_type") == "current_room"
+                            else "灵感图" if item.get("asset_type") == "inspiration"
+                            else "户型图" if item.get("asset_type") == "floorplan"
+                            else "图片"
+                        ),
                         "kind": item.get("asset_type") or "general",
                     }
                     for idx, item in enumerate(message.get("attachments") or [])
                 ]
                 or None,
                 references=message.get("references") or [],
+                floorplanJobId=message.get("floorplanJobId"),
+                floorplanStatus=message.get("floorplanStatus"),
+                floorplanAnalysis=message.get("floorplanAnalysis"),
                 created_at=message["created_at"],
             )
         )
