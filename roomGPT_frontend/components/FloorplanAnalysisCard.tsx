@@ -98,6 +98,21 @@ export default function FloorplanAnalysisCard({
     setIsEditing((analysis.phase || "analysis") !== "generation");
   }, [analysis]);
 
+  const preloadImages = () => {
+    analysis.rooms?.forEach((room) => {
+      if (room.imageUrl) {
+        const img = new window.Image();
+        img.src = room.imageUrl;
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (analysis.phase === "generation" || analysis.generation?.started) {
+      preloadImages();
+    }
+  }, [analysis.rooms, analysis.phase, analysis.generation?.started]);
+
   useEffect(() => {
     const rooms = analysis.rooms || [];
     if (!rooms.length) {
@@ -413,6 +428,7 @@ export default function FloorplanAnalysisCard({
                         src={activeRoom.imageUrl}
                         alt={`${activeRoom.name} 效果图`}
                         className="h-56 w-full object-cover"
+                        loading="lazy"
                       />
                     </button>
                   ) : (
