@@ -1,6 +1,6 @@
 # 🏠✨ Lumière - AI 智能家装规划师 (AI Home Renovation Planner)
 
-这是一个基于多智能体（Multi-Agent）系统构建的高级智能家装平台。它能够分析您房间的照片，为您制定个性化的翻新计划，利用强大的多模态 AI 生成照片级真实的室内设计渲染图，并自动将 2D 效果图转换为可 360° 交互预览的 **3D 模型**。
+这是一个基于多智能体（Multi-Agent）系统构建的高级智能家装平台。它能够分析您房间的照片，为您制定个性化的翻新计划，利用强大的多模态 AI 生成照片级真实的室内设计渲染图，并内置 RAG 知识库检索提供专业的装修知识参考。
 
 ## ✨ 核心特色
 
@@ -8,17 +8,18 @@
 
 - **🎨 全新前端 (Next.js + roomGPT)**: 采用 roomGPT 前端交互体验，面向中文用户。前端直接对接本地 FastAPI 接口。
 - **⚙️ 纯净 API 后端 (Python + FastAPI)**: 将 LangGraph Agent 逻辑封装为标准 RESTful API + SSE 流式接口。支持文字交互、多模态图片上传及流式/批量事件响应。
-- **🧊 3D 模型自动生成**: 效果图生成完成后，自动调用腾讯云混元生3D API 将 2D 效果图转换为 GLB 格式 3D 模型，在聊天界面内嵌展示，支持 360° 旋转、缩放、下载。
+- **📚 RAG 知识库检索**: 内置装修专业知识库，用户发送消息时自动语义检索相关知识条目，注入 Agent 系统提示中，提升回答的专业性和准确性。
 
 ## 功能特性
 
 - **🔍 智能图像分析**: 上传房间现状照片和心仪的灵感参考图 —— 智能体将自动检测并综合分析
-- **🎨 照片级逼真渲染**: 使用大模型为您生成具有专业水准的室内设计渲染图
-- **🧊 3D 模型预览**: 效果图生成后自动触发 3D 转换，在对话中直接 360° 交互预览（基于 Google `<model-viewer>`）
+- **🎨 照片级逼真渲染**: 使用大模型为您生成具有专业水准的室内设计渲染图，支持 structure-locked 提示保持原图布局
+- **📚 RAG 知识库增强**: 内置 80 条中文装修知识，对话中自动语义检索并注入 Agent，提升建议专业度
 - **💰 预算感知规划**: 根据您的预算限制量身定制装修建议
 - **📊 完整的装修路线图**: 提供时间进度表、详细的预算明细、承包商清单以及具体行动执行清单
 - **🤖 多智能体协同编排**: 演示"协调者(Coordinator)/分发者(Dispatcher) + 顺序流水线(Sequential Pipeline)"智能体设计模式
 - **✏️ 持续迭代优化**: 根据您的反馈可随时编辑、调整生成的渲染图
+- **🏗️ 户型图智能分析**: 上传户型图，AI 自动识别房间区域并支持逐房间效果图批量生成
 
 ## 工作原理
 
@@ -37,7 +38,6 @@
 3. **项目协调员 (Project Coordinator)** 🏗️
    - 生成全面的房屋翻新行动路线图
    - 绘制翻新后空间的逼真渲染图（2D）
-   - 自动触发腾讯云混元生3D 将效果图转换为 3D 模型
    - 提供各类成本细目、时间表和实操步骤
 
 ## 技术架构
@@ -48,25 +48,27 @@
               ▼ HTTP / SSE
          FastAPI 后端 (server.py)
               │
-     ┌────────┴─────────┐
-     ▼                  ▼
- LangGraph 主图      LangGraph 渲染子图
- (多Agent流水线)     (render_graph)
-     │                  │
-     ▼                  ▼
- DashScope           DashScope wan2.7-image
- qwen3-max/vl        (2D 效果图生成)
-                         │
-                         ▼ 自动触发
-                  三腾讯云混元生3D
-                  (three_d_provider.py)
-                         │
-                         ▼
-                   GLB 3D 模型文件
+     ┌────────┴──────────┐
+     ▼                   ▼
+ LangGraph 主图       LangGraph 渲染子图
+ (多Agent流水线)      (render_graph)
+     │                   │
+     ▼                   ▼
+ LLM Provider       LLM Provider
+ (qwen3-max)     (wan2.7-image/qwen3-vl-plus)
+     │                   │
+     ▼                   ▼
+ 文本分析 + 工具     2D 效果图生成
+ (搜索/预算/周期)   (structure-locked)
                          │
                          ▼
-                  <model-viewer> 前端展示
-                  (ModelViewer.tsx)
+                   图片存储 + 数据库
+                   (.adk/artifacts/)
+                         │
+     ┌───────────────────┘
+     ▼
+ RAG 知识库检索
+ (DashScope Embedding)
 ```
 
 ## 快速开始
@@ -100,7 +102,8 @@ npm run dev
 
 ### 本地数据说明
 - 会话、消息和图片元数据保存在本地 SQLite：`.adk/planner.db`
-- 生成的图片 artifact 和 3D 模型（.glb）保存在 `.adk/artifacts/`
+- 生成的图片 artifact 保存在 `.adk/artifacts/`
+- 知识库向量索引：`rag/index/embeddings.npy` + `rag/index/metadata.json`
 - 这些文件仅用于本地开发，不会自动上传到远程服务
 
 ## 使用场景示例
@@ -110,7 +113,7 @@ npm run dev
 [上传您厨房的照片]
 "我手头有 5 万元预算，怎样能让这里变得更好看？"
 ```
-→ 智能体分析空间 → 生成设计方案 → 生成 2D 效果图 → **自动生成 3D 模型供360°预览**
+→ 智能体分析空间 → 生成设计方案 → 生成 2D 效果图
 
 ### 场景 2: 房间照片 + 设计灵感图
 ```
@@ -118,7 +121,7 @@ npm run dev
 [上传图片 2: 从小红书找来的灵感图]
 "把我的厨房改造成图2这种风格大概需要多少钱？"
 ```
-→ 智能体吸收灵感图设计元素 → 提供预算预估 → 出具渲染图及 3D 模型
+→ 智能体吸收灵感图设计元素 → 提供预算预估 → 出具渲染图
 
 ### 场景 3: 循环迭代修改
 ```
@@ -140,9 +143,9 @@ npm run dev
 | `baidu_search_tool` | 百度千帆 AI 搜索，获取国内装修成本、建材价格 |
 | `estimate_renovation_cost_tool` | 依据空间类型、面积和改造深度估算费用 |
 | `calculate_timeline_tool` | 预估工程耗时周期 |
-| `generate_renovation_rendering_tool` | 生成照片级渲染图（DashScope wan2.7） |
+| `generate_renovation_rendering_tool` | 生成照片级渲染图（structure-locked 提示约束） |
 | `edit_renovation_rendering_tool` | 根据反馈重绘或局部修改效果图 |
-| 自动 3D 生成 | 效果图完成后自动触发腾讯云混元生3D，输出 GLB 文件 |
+| RAG 知识库检索 | 对话中自动语义检索装修知识，注入 Agent 增强回答 |
 
 ## 多智能体架构
 
@@ -152,7 +155,7 @@ npm run dev
     └── 规划流水线 (Planning Pipeline - 顺序执行)
           ├── 视觉评估师 (Visual Assessor - 图像分析)
           ├── 设计规划师 (Design Planner - 方案规划)
-          └── 项目协调员 (Project Coordinator - 渲染图 + 3D 模型 + 路线图)
+          └── 项目协调员 (Project Coordinator - 渲染图 + 路线图)
 ```
 
 **为什么采用这种模式？**
